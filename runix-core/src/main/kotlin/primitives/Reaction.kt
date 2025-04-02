@@ -1,34 +1,10 @@
 package runix.primitives
 
-import kotlinx.coroutines.flow.StateFlow
-import runix.core.logging.primitives.ActionCall
 import runix.core.logging.primitives.RunixExecutionContext
 import runix.primitives.tracing.ExecutionTrace
-import runix.primitives.tracing.child
 import runix.tracing.ExecutionStatus
 import runix.tracing.ExecutionTimer
 import runix.tracing.TraceLogEntry
-
-class ReactionContext(private val base: RunixExecutionContext) {
-    val trace: ExecutionTrace get() = base.trace
-    val scheduler: RunixScheduler get() = base.scheduler
-
-    companion object {
-        fun from(ctx: RunixExecutionContext): ReactionContext = ReactionContext(ctx)
-    }
-
-    suspend fun <T> run(call: ActionCall<T>) {
-        val childTrace = trace.child(call.action.name)
-        scheduler.schedule(call.action, call.input, childTrace)
-    }
-
-    suspend fun runAll(vararg calls: ActionCall<*>) {
-        calls.forEach { call ->
-            @Suppress("UNCHECKED_CAST")
-            run(call as ActionCall<Any?>)
-        }
-    }
-}
 
 class Reaction(
     override val name: String,
@@ -40,8 +16,9 @@ class Reaction(
 
     override suspend fun runWithContext(context: RunixExecutionContext) {
         val trace = context.trace
-        val logger = context.scheduler.traceLogger
-        val traceManager = context.scheduler.traceManager
+        val scheduler = context.scheduler
+        val logger = scheduler.traceLogger
+        val traceManager = scheduler.traceManager
         val timer = ExecutionTimer.start()
 
         try {
@@ -75,12 +52,12 @@ class Reaction(
                     context = mapOf("error" to (e.message ?: "unknown"))
                 )
             )
-            traceManager.complete(trace.id, "Failed")
+            traceManager.complete(trace.id, "Failure")
             throw e
         }
     }
 
     override suspend fun execute(trace: ExecutionTrace) {
-        error("Use runWithContext(...) instead of execute()")
+        error("Use runWithContext(...) instead.")
     }
 }

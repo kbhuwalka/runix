@@ -5,48 +5,43 @@ import kotlinx.coroutines.withTimeout
 import runix.core.logging.primitives.RunixExecutionContext
 import runix.primitives.tracing.ExecutionTrace
 import runix.tracing.ExecutionTimer
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 sealed interface ActionResult {
     data class Success(val message: String? = null) : ActionResult
     data class Failure(val message: String, val recoverable: Boolean = true) : ActionResult
 }
 
-abstract class Action<T>(override val name: String) : RunixExecutable {
+abstract class Action(
+    override val name: String
+) : RunixExecutable {
 
-    /** Core logic for this action */
-    abstract suspend fun onExecute(params: T, context: ActionContext): ActionResult
+    open val timeout: Duration = 5.seconds
 
-    /** Optional precondition check */
-    open fun onPreconditions(params: T): Boolean = true
+    open fun onPreconditions(): Boolean = true
 
-    /** Called when action succeeds */
     open fun onSuccess(result: ActionResult.Success, trace: ExecutionTrace) {}
-
-    /** Called when action fails */
     open fun onFailure(result: ActionResult.Failure, trace: ExecutionTrace) {}
-
-    /** Called when action times out */
     open fun onTimeout(trace: ExecutionTrace) {}
-
-    /** Called when preconditions are not met */
     open fun onSkipped(trace: ExecutionTrace) {}
 
-    override suspend fun runWithContext(context: RunixExecutionContext) {
-        val input = context.input as? T ?: error("Missing input for Action: $name")
-        val actionContext = ActionContext.from(context)
-        val trace = context.trace
+    abstract suspend fun onExecute(context: ActionContext): ActionResult
 
+    override suspend fun runWithContext(context: RunixExecutionContext) {
+        val trace = context.trace
+        val actionContext = ActionContext.from(context)
         val timer = ExecutionTimer.start()
 
-        if (!onPreconditions(input)) {
+        if (!onPreconditions()) {
             actionContext.logSkipped(name, "Preconditions not met")
             onSkipped(trace)
             return
         }
 
         try {
-            val result = withTimeout(actionContext.timeout.inWholeMilliseconds) {
-                onExecute(input, actionContext)
+            val result = withTimeout(timeout.inWholeMilliseconds) {
+                onExecute(actionContext)
             }
 
             when (result) {
@@ -64,19 +59,21 @@ abstract class Action<T>(override val name: String) : RunixExecutable {
             }
 
         } catch (e: TimeoutCancellationException) {
-            actionContext.logTimeout(name)
-            context.awaiter?.complete(ActionResult.Failure("Timeout"))
+            val fail = ActionResult.Failure("Timed out", recoverable = true)
+            actionContext.logTimeout(name, timeout)
+            context.awaiter?.complete(fail)
             onTimeout(trace)
+
         } catch (e: Exception) {
-            val reason = "Unhandled exception: ${e.message ?: "unknown"}"
-            actionContext.logFailure(name, reason, recoverable = false, duration = timer.elapsed())
-            context.awaiter?.complete(ActionResult.Failure(reason, recoverable = false))
-            onFailure(ActionResult.Failure(reason, recoverable = false), trace)
+            val reason = e.message ?: "Unknown error"
+            val fail = ActionResult.Failure(reason, recoverable = false)
+            actionContext.logFailure(name, reason, recoverable = false, timer.elapsed())
+            context.awaiter?.complete(fail)
+            onFailure(fail, trace)
         }
     }
 
-    /** Prevent incorrect execution */
     override suspend fun execute(trace: ExecutionTrace) {
-        error("Use run(...) with parameters and context instead of execute()")
+        error("Use runWithContext(...) instead.")
     }
 }

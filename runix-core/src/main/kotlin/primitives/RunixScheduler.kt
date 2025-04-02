@@ -122,56 +122,24 @@ class RunixScheduler(
 
     // === Convenience overloads ===
 
-    fun <T> schedule(action: Action<T>, input: T, parentTrace: ExecutionTrace? = null) {
-        val trace = childTraceFor(action.name, parentTrace)
-        schedule(RunixJob(action, trace, input))
+    fun schedule(executable: RunixExecutable, parentTrace: ExecutionTrace? = null) {
+        val trace = childTraceFor(executable.name, parentTrace)
+        schedule(RunixJob(executable, trace))
     }
 
-    fun <T> runNow(action: Action<T>, input: T, parentTrace: ExecutionTrace? = null) {
-        val trace = childTraceFor(action.name, parentTrace)
+    fun runNow(executable: RunixExecutable, parentTrace: ExecutionTrace? = null) {
+        val trace = childTraceFor(executable.name, parentTrace)
         coroutineScope.launch {
-            runNow(RunixJob(action, trace, input))
+            runNow(RunixJob(executable, trace))
         }
     }
 
-    suspend fun <T> runNowAndWait(action: Action<T>, input: T, parentTrace: ExecutionTrace? = null): ActionResult {
-        val awaiter = CompletableDeferred<ActionResult>()
-
-        val trace = ExecutionTrace(
-            parentId = parentTrace?.id,
-            path = parentTrace?.path.orEmpty() + action.name,
-            scheduler = this
-        )
-
-        val job = RunixJob(action, trace, input, awaiter)
+    suspend fun runNowAndWait(action: Action, parentTrace: ExecutionTrace? = null): ActionResult {
+        val waiter = CompletableDeferred<ActionResult>()
+        val trace = childTraceFor(action.name, parentTrace)
+        val job = RunixJob(action, trace, waiter)
         runNow(job)
-        return awaiter.await()
-    }
-
-    suspend fun <T> scheduleAndWait(action: Action<T>, input: T, parentTrace: ExecutionTrace? = null): ActionResult {
-        val awaiter = CompletableDeferred<ActionResult>()
-
-        val trace = ExecutionTrace(
-            parentId = parentTrace?.id,
-            path = parentTrace?.path.orEmpty() + action.name,
-            scheduler = this
-        )
-
-        val job = RunixJob(action, trace, input, awaiter)
-        schedule(job)
-        return awaiter.await()
-    }
-
-    fun schedule(reaction: Reaction, parentTrace: ExecutionTrace? = null) {
-        val trace = childTraceFor(reaction.name, parentTrace)
-        schedule(RunixJob(reaction, trace))
-    }
-
-    fun runNow(reaction: Reaction, parentTrace: ExecutionTrace? = null) {
-        val trace = childTraceFor(reaction.name, parentTrace)
-        coroutineScope.launch {
-            runNow(RunixJob(reaction, trace))
-        }
+        return waiter.await()
     }
 
     private fun childTraceFor(name: String, parent: ExecutionTrace?): ExecutionTrace {

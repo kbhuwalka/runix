@@ -9,119 +9,57 @@ import runix.tracing.tools.TraceVisualizer
 import java.io.File
 
 fun main() = runBlocking {
-    println("🚀 Booting CleanBot X1...")
+    println("🚀 Booting WarehouseBot Brain...")
     val logger = FileTraceLogger(File("logs"))
     val scheduler = RunixScheduler(traceLogger = logger)
     scheduler.start()
 
     val handles = listOf(
         scheduler.register(Reactions.StartOnCommand),
-        scheduler.register(Reactions.LowBatteryAbort),
-        scheduler.register(Reactions.DockedAndCharging),
-        scheduler.register(Reactions.ResumeAfterRecharge),
-        scheduler.register(Reactions.ObstacleDetected),
-        scheduler.register(Reactions.CleaningFailed),
-        scheduler.register(Reactions.EmergencyTriggered),
-        scheduler.register(Reactions.AlertUserOnError),
+        scheduler.register(Reactions.DropFailed),
+        scheduler.register(Reactions.RetryDropEscalation),
+        scheduler.register(Reactions.MotorFailureHandler),
+        scheduler.register(Reactions.GripperFailureHandler),
+        scheduler.register(Reactions.DropSuccessWrapUp),
+        scheduler.register(Reactions.BatteryLowInterruption),
+        scheduler.register(Reactions.FallbackNavFailure),
+        scheduler.register(Reactions.EscalateAfterDropFails),
+        scheduler.register(Reactions.HandleNavigationFailure)
     )
 
     delay(1000)
 
-    println("\n🧠 [User] Starting cleaning")
-    BotState.startRequested.value = true
+    println("\n🧠 [User] Starting delivery")
+    scheduler.fireSignal("StartDelivery")
 
     delay(2000)
 
-    println("\n📦 [System] Cleaning in progress... Updating state...")
-    BotState.location.value = "room"
-    BotState.batteryLevel.value = 95
-
-    delay(1500)
-
-    println("\n💧 [Sensor] Water tank now empty")
-    BotState.waterTankFull.value = false
-
-    delay(3000)
-
-    println("\n🧼 [CleanBot] Docked for refill")
-    BotState.location.value = "dock"
-
-    delay(2000)
-
-    println("\n💧 [User] Refilling water tank manually...")
-    BotState.waterTankFull.value = true
-
-    delay(2000)
-
-    println("\n🧱 [Sensor] Obstacle detected (furniture)")
-    BotState.obstacleDetected.value = true
-
-    delay(2500)
-
-    println("\n🔋 [System] Battery draining...")
-    BotState.batteryLevel.value = 40
-    delay(1000)
-    BotState.batteryLevel.value = 25
-    delay(1000)
-    BotState.batteryLevel.value = 14
-
-    delay(3000)
-
-    println("\n💤 [CleanBot] Docked and charging...")
-    BotState.location.value = "dock"
-
-    delay(500)
-
-    println("\n🔌 [Charger] Boosting battery...")
-    BotState.batteryLevel.value = 30
-    delay(1000)
+    println("\n⚡ [System] Simulating gradual battery drain")
     BotState.batteryLevel.value = 50
     delay(1000)
-    BotState.batteryLevel.value = 65
+    BotState.batteryLevel.value = 30
     delay(1000)
-    BotState.batteryLevel.value = 80
+    BotState.batteryLevel.value = 18
+
+    delay(5000)
+
+    println("\n🎯 [Sim] Faking drop failure and retry")
+    scheduler.fireSignal("DropFailed")
+
+    delay(4000)
+
+    println("\n🔧 [Sim] Faking motor failure (should cancel delivery)")
+    scheduler.fireSignal("MotorFailure")
 
     delay(3000)
 
-    println("\n🧪 [CleanBot] Resumed cleaning post-charge")
-    BotState.location.value = "room"
-    BotState.startRequested.value = true
-
-    delay(2000)
-
-    println("\n⚠️ [System] Suction failure simulated")
-    scheduler.runNow(ActivateSuction, Unit)
-
-    delay(3000)
-
-    println("\n🆘 [User] Emergency stop fired!")
-    scheduler.runNow(EmergencyStopAction, Unit)
-
-    delay(3000)
-
-    println("\n🧼 [User] Restarting cleaning manually...")
+    println("\n🧼 [Reset] Resuming delivery after fix")
     BotState.batteryLevel.value = 85
-    BotState.location.value = "room"
-    BotState.startRequested.value = true
+    scheduler.fireSignal("StartDelivery")
 
-    delay(2500)
+    delay(5000)
 
-    println("\n🧱 [Sensor] Obstacle detected again (cable)")
-    BotState.obstacleDetected.value = true
-
-    delay(2500)
-
-    println("\n✅ [Sensor] Path now clear again")
-    BotState.pathClear.value = true
-
-    delay(2000)
-
-    println("\n🕒 [System] Cleaning complete simulated")
-    scheduler.fireSignal("CleaningComplete")
-
-    delay(3000)
-
-    println("\n✅ Simulation complete. Shutting down CleanBot X1.")
+    println("\n✅ Simulation complete. Shutting down WarehouseBot.")
     handles.forEach { it.dispose() }
 
     val logFile = logger.getLogFile()
@@ -129,6 +67,5 @@ fun main() = runBlocking {
     TraceVisualizer.generateFrom(logFile, outputDir)
 
     println("✅ Mermaid diagrams written to ${outputDir.absolutePath}")
-
     TimelineViewer.printTimeline(logFile)
 }

@@ -2,23 +2,41 @@ package runix.primitives
 
 import runix.core.logging.primitives.RunixExecutionContext
 import runix.primitives.tracing.ExecutionTrace
+import runix.primitives.tracing.child
 import runix.tracing.ExecutionStatus
 import runix.tracing.TraceLogEntry
 import java.time.Instant
 import kotlin.time.Duration
-
 class ActionContext private constructor(
     private val base: RunixExecutionContext
 ) {
     val trace: ExecutionTrace get() = base.trace
-    val scheduler: RunixScheduler get() = base.scheduler
-    val awaiter = base.awaiter
-    val timeout: Duration = base.timeout
 
-    private val logger = scheduler.traceLogger
-    private val traceManager = scheduler.traceManager
+    // Internal use only – not exposed to devs
+    private val logger = base.scheduler.traceLogger
+    private val traceManager = base.scheduler.traceManager
+    private val scheduler = base.scheduler
+    private val awaiter = base.awaiter
 
-    fun logSuccess(name: String, message: String, duration: Duration) {
+    // --- Child Execution Helpers ---
+
+    suspend fun runChildAndWait(action: Action): ActionResult {
+        val childTrace = trace.child("Run")
+        return scheduler.runNowAndWait(action, childTrace)
+    }
+
+    fun scheduleChild(action: Action) {
+        val childTrace = trace.child("Schedule")
+        scheduler.schedule(action, childTrace)
+    }
+
+    fun fireSignal(name: String) {
+        scheduler.fireSignal(name)
+    }
+
+    // --- Internal Logging Helpers ---
+
+    internal fun logSuccess(name: String, message: String, duration: Duration) {
         trace.logSuccess(message)
         logger?.log(
             TraceLogEntry(
@@ -36,7 +54,7 @@ class ActionContext private constructor(
         traceManager.complete(trace.id, message)
     }
 
-    fun logFailure(name: String, reason: String, recoverable: Boolean, duration: Duration) {
+    internal fun logFailure(name: String, reason: String, recoverable: Boolean, duration: Duration) {
         trace.logFailure(reason, recoverable)
         logger?.log(
             TraceLogEntry(
@@ -48,13 +66,16 @@ class ActionContext private constructor(
                 durationMs = duration.inWholeMilliseconds,
                 status = ExecutionStatus.Failure,
                 tracePath = trace.path,
-                context = mapOf("message" to reason, "recoverable" to recoverable.toString())
+                context = mapOf(
+                    "message" to reason,
+                    "recoverable" to recoverable.toString()
+                )
             )
         )
         traceManager.complete(trace.id, "Failure")
     }
 
-    fun logSkipped(name: String, reason: String) {
+    internal fun logSkipped(name: String, reason: String) {
         trace.logSkipped(reason)
         logger?.log(
             TraceLogEntry(
@@ -66,14 +87,14 @@ class ActionContext private constructor(
                 durationMs = 0,
                 status = ExecutionStatus.Skipped,
                 tracePath = trace.path,
-                context = mapOf("message" to reason)
+                context = mapOf("reason" to reason)
             )
         )
         traceManager.complete(trace.id, "Skipped")
     }
 
-    fun logTimeout(name: String) {
-        trace.logTimeout("Action [$name] timed out after $timeout")
+    internal fun logTimeout(name: String, duration: Duration) {
+        trace.logTimeout("Action [$name] timed out after $duration")
         logger?.log(
             TraceLogEntry(
                 id = trace.id,
@@ -81,7 +102,7 @@ class ActionContext private constructor(
                 type = "Action",
                 name = name,
                 timestamp = Instant.now(),
-                durationMs = timeout.inWholeMilliseconds,
+                durationMs = duration.inWholeMilliseconds,
                 status = ExecutionStatus.Timeout,
                 tracePath = trace.path
             )
@@ -90,6 +111,6 @@ class ActionContext private constructor(
     }
 
     companion object {
-        fun from(ctx: RunixExecutionContext) = ActionContext(ctx)
+        fun from(ctx: RunixExecutionContext): ActionContext = ActionContext(ctx)
     }
 }
