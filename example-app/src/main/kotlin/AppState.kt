@@ -1,11 +1,10 @@
-import runix.primitives.MutableRunixFlow
-import runix.primitives.runixMutable
+import runix.primitives.mutableRunixFlow
 
 object BotState {
-    val atDropZone = runixMutable("atDropZone", false)
-    val dropSuccessful = runixMutable("dropSuccessful", true)
-    val batteryLevel = runixMutable("batteryLevel", 100)
-    val isCharging = runixMutable("isCharging", false)
-    val currentZone = runixMutable("currentZone", "home")
-    val dropAttempts = runixMutable("dropAttempts", 0)
+    val atDropZone = mutableRunixFlow("atDropZone", false)
+    val dropSuccessful = mutableRunixFlow("dropSuccessful", true)
+    val batteryLevel = mutableRunixFlow("batteryLevel", 100)
+    val isCharging = mutableRunixFlow("isCharging", false)
+    val currentZone = mutableRunixFlow("currentZone", "home")
+    val dropAttempts = mutableRunixFlow("dropAttempts", 0)
 }

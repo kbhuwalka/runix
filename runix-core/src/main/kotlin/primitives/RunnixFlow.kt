@@ -2,8 +2,6 @@ package runix.primitives
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-typealias AnyRunixFlow = IRunixFlow<Any?>
-
 // Common interface for all named flows
 interface IRunixFlow<T> {
     val name: String
@@ -38,10 +36,10 @@ class MutableRunixFlow<T>(
     override fun toString(): String = "$name=$value"
 }
 
-fun <T> runixMutable(name: String, initial: T): MutableRunixFlow<T> {
+fun <T> mutableRunixFlow(name: String, initial: T): MutableRunixFlow<T> {
     return MutableRunixFlow(name, MutableStateFlow(initial))
 }
 
-fun <T> runixReadOnly(name: String, flow: StateFlow<T>): RunixFlow<T> {
+fun <T> runixFlow(name: String, flow: StateFlow<T>): RunixFlow<T> {
     return RunixFlow(name, flow)
 }
