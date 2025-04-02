@@ -1,7 +1,11 @@
 package demo.CleanBot
 
 import BotState
-import kotlinx.coroutines.*
+import DropFailed
+import MotorFailed
+import StartDelivery
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import runix.primitives.RunixScheduler
 import runix.tools.TimelineViewer
 import runix.tracing.FileTraceLogger
@@ -16,7 +20,7 @@ fun main() = runBlocking {
 
     val handles = listOf(
         scheduler.register(Reactions.StartOnCommand),
-        scheduler.register(Reactions.DropFailed),
+        scheduler.register(Reactions.DropFailedHandler),
         scheduler.register(Reactions.RetryDropEscalation),
         scheduler.register(Reactions.MotorFailureHandler),
         scheduler.register(Reactions.GripperFailureHandler),
@@ -30,7 +34,7 @@ fun main() = runBlocking {
     delay(1000)
 
     println("\n🧠 [User] Starting delivery")
-    scheduler.fireSignal("StartDelivery")
+    scheduler.fireSignal(StartDelivery)
 
     delay(2000)
 
@@ -44,18 +48,18 @@ fun main() = runBlocking {
     delay(5000)
 
     println("\n🎯 [Sim] Faking drop failure and retry")
-    scheduler.fireSignal("DropFailed")
+    scheduler.fireSignal(DropFailed)
 
     delay(4000)
 
     println("\n🔧 [Sim] Faking motor failure (should cancel delivery)")
-    scheduler.fireSignal("MotorFailure")
+    scheduler.fireSignal(MotorFailed)
 
     delay(3000)
 
     println("\n🧼 [Reset] Resuming delivery after fix")
     BotState.batteryLevel.value = 85
-    scheduler.fireSignal("StartDelivery")
+    scheduler.fireSignal(StartDelivery)
 
     delay(5000)
 

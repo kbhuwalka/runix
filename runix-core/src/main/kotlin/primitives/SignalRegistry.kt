@@ -7,6 +7,7 @@ import kotlinx.coroutines.launch
 import runix.primitives.Reaction
 import runix.primitives.RunixJob
 import runix.primitives.RunixScheduler
+import runix.primitives.Signal
 import runix.primitives.tracing.ExecutionTrace
 import runix.primitives.tracing.child
 import runix.tracing.ExecutionStatus
@@ -23,9 +24,11 @@ class SignalRegistry(
     private val signals = mutableMapOf<String, MutableSharedFlow<Unit>>()
     private val listeners = mutableMapOf<String, MutableList<Reaction>>()
 
-    fun fire(name: String) {
+    fun fire(signal: Signal) {
+        val name = signal.name
         val subscribedReactions = listeners[name].orEmpty()
 
+        // Create trace for signal emission
         val trace = ExecutionTrace(
             path = listOf("Signal($name)"),
             scheduler = scheduler
@@ -45,15 +48,12 @@ class SignalRegistry(
             )
         )
 
-        // Schedule each reaction with a child trace
-        subscribedReactions.forEach { reaction ->
-            val childTrace = trace.child(reaction.name)
-            scheduler.schedule(RunixJob(reaction, childTrace))
+        scope.launch {
+            signals[name]?.emit(Unit)
         }
 
-        // Still emit for any dev-facing listeners
-        signals[name]?.let { flow ->
-            scope.launch { flow.emit(Unit) }
+        subscribedReactions.forEach { reaction ->
+            scheduler.schedule(reaction)
         }
     }
 
@@ -63,7 +63,7 @@ class SignalRegistry(
         }
     }
 
-    fun subscribe(signalName: String, reaction: Reaction) {
-        listeners.getOrPut(signalName) { mutableListOf() }.add(reaction)
+    fun subscribe(signal: Signal, reaction: Reaction) {
+        listeners.getOrPut(signal.name) { mutableListOf() }.add(reaction)
     }
 }

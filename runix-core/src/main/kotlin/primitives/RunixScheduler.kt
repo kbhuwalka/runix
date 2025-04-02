@@ -10,6 +10,7 @@ import runix.primitives.tracing.ExecutionTrace
 import runix.tracing.LiveTraceManager
 import runix.tracing.TraceLogger
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.sign
 
 class RunixScheduler(
     private val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
@@ -72,8 +73,8 @@ class RunixScheduler(
         job.run(this)
     }
 
-    fun fireSignal(name: String) {
-        signalRegistry.fire(name)
+    fun fireSignal(signal: Signal) {
+        signalRegistry.fire(signal)
     }
 
     // Register a Reaction with state and signal watchers

@@ -9,7 +9,7 @@ import runix.tracing.TraceLogEntry
 class Reaction(
     override val name: String,
     val dependsOn: List<IRunixFlow<*>>,
-    val signalNames: List<String> = emptyList(),
+    val signalNames: List<Signal> = emptyList(),
     val condition: () -> Boolean,
     val onFired: suspend (ReactionContext) -> Unit
 ) : RunixExecutable {

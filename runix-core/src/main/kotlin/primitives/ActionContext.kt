@@ -30,8 +30,8 @@ class ActionContext private constructor(
         scheduler.schedule(action, childTrace)
     }
 
-    fun fireSignal(name: String) {
-        scheduler.fireSignal(name)
+    fun fireSignal(signal: Signal) {
+        scheduler.fireSignal(signal)
     }
 
     // --- Internal Logging Helpers ---

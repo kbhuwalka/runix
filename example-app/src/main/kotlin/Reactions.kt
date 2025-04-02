@@ -1,13 +1,20 @@
 package demo.CleanBot
 
 import BotState
+import DropFailed
+import DropSucceeded
+import FallbackNavigationFailed
+import GripperFailed
+import MotorFailed
+import NavigationFailed
+import StartDelivery
 import runix.primitives.Reaction
 
 object Reactions {
 
     val StartOnCommand = Reaction(
         name = "Reaction(StartOnCommand)",
-        signalNames = listOf("StartDelivery"),
+        signalNames = listOf(StartDelivery),
         dependsOn = emptyList(),
         condition = { true },
         onFired = { ctx ->
@@ -18,9 +25,9 @@ object Reactions {
         }
     )
 
-    val DropFailed = Reaction(
+    val DropFailedHandler = Reaction(
         name = "Reaction(DropFailedHandler)",
-        signalNames = listOf("DropFailed"),
+        signalNames = listOf(DropFailed),
         dependsOn = emptyList(),
         condition = { true },
         onFired = { ctx ->
@@ -33,7 +40,7 @@ object Reactions {
 
     val RetryDropEscalation = Reaction(
         name = "Reaction(RetryEscalation)",
-        signalNames = listOf("DropFailed"),
+        signalNames = listOf(DropFailed),
         dependsOn = listOf(BotState.dropSuccessful),
         condition = { !BotState.dropSuccessful.value },
         onFired = { ctx ->
@@ -47,7 +54,7 @@ object Reactions {
 
     val MotorFailureHandler = Reaction(
         name = "Reaction(MotorFailure)",
-        signalNames = listOf("MotorFailure"),
+        signalNames = listOf(MotorFailed),
         dependsOn = listOf(),
         condition = { true },
         onFired = { ctx ->
@@ -60,7 +67,7 @@ object Reactions {
 
     val GripperFailureHandler = Reaction(
         name = "Reaction(GripperFailure)",
-        signalNames = listOf("GripperFailure"),
+        signalNames = listOf(GripperFailed),
         dependsOn = listOf(),
         condition = { true },
         onFired = { ctx ->
@@ -73,7 +80,7 @@ object Reactions {
 
     val DropSuccessWrapUp = Reaction(
         name = "Reaction(WrapUp)",
-        signalNames = listOf("DropSuccess"),
+        signalNames = listOf(DropSucceeded),
         dependsOn = listOf(),
         condition = { true },
         onFired = { ctx ->
@@ -111,7 +118,7 @@ object Reactions {
 
     val FallbackNavFailure = Reaction(
         name = "Reaction(FallbackNavFailure)",
-        signalNames = listOf("NavigationFailed"),
+        signalNames = listOf(FallbackNavigationFailed),
         dependsOn = listOf(BotState.currentZone),
         condition = { BotState.currentZone.value == "fallback" },
         onFired = { ctx ->
@@ -124,7 +131,7 @@ object Reactions {
 
     val HandleNavigationFailure = Reaction(
         name = "Reaction(HandleNavigationFailure)",
-        signalNames = listOf("NavigationFailed"),
+        signalNames = listOf(NavigationFailed),
         dependsOn = listOf(BotState.currentZone),
         condition = { BotState.currentZone.value != "fallback" },
         onFired = { ctx ->

@@ -1,6 +1,11 @@
 package demo.CleanBot
 
 import BotState
+import DropFailed
+import DropSucceeded
+import GripperFailed
+import MotorFailed
+import NavigationFailed
 import kotlinx.coroutines.delay
 import runix.primitives.*
 import kotlin.random.Random
@@ -11,7 +16,7 @@ object StartMotor : Action("StartMotor") {
         return if (Random.nextDouble() < 0.9) {
             ActionResult.Success("Motor started")
         } else {
-            context.fireSignal("MotorFailure")
+            context.fireSignal(MotorFailed)
             ActionResult.Failure("Motor failed", recoverable = false)
         }
     }
@@ -23,7 +28,7 @@ object ActivateGripper : Action("ActivateGripper") {
         return if (Random.nextBoolean()) {
             ActionResult.Success("Gripper activated")
         } else {
-            context.fireSignal("GripperFailure")
+            context.fireSignal(GripperFailed)
             ActionResult.Failure("Gripper jammed", recoverable = true)
         }
     }
@@ -36,7 +41,7 @@ object NavigateToDropZone : Action("NavigateToDropZone") {
             BotState.currentZone.value = "drop"
             ActionResult.Success("Reached drop zone")
         } else {
-            context.fireSignal("NavigationFailed")
+            context.fireSignal(NavigationFailed)
             ActionResult.Failure("Couldn't reach drop zone")
         }
     }
@@ -48,10 +53,10 @@ object DropPackage : Action("DropPackage") {
         return if (Random.nextDouble() < 0.75) {
             BotState.dropSuccessful.value = true
             BotState.dropAttempts.value += 1
-            context.fireSignal("DropSuccess")
+            context.fireSignal(DropSucceeded)
             ActionResult.Success("Dropped package")
         } else {
-            context.fireSignal("DropFailed")
+            context.fireSignal(DropFailed)
             ActionResult.Failure("Drop failed", recoverable = true)
         }
     }
