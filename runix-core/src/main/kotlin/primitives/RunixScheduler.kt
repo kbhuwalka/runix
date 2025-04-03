@@ -9,6 +9,7 @@ import runix.core.logging.primitives.RunixExecutionContext
 import runix.primitives.internal.SignalRegistry
 import runix.primitives.tracing.ExecutionTrace
 import runix.tracing.LiveTraceManager
+import runix.tracing.Trace
 import runix.tracing.TraceLogger
 import java.util.concurrent.ConcurrentHashMap
 
@@ -166,11 +167,7 @@ class RunixScheduler(
         return waiter.await()
     }
 
-    internal fun childTraceFor(name: String, parent: ExecutionTrace?): ExecutionTrace {
-        return ExecutionTrace(
-            parentId = parent?.id,
-            path = parent?.path.orEmpty() + name,
-            scheduler = this
-        )
+    private fun childTraceFor(name: String, parent: ExecutionTrace?): ExecutionTrace {
+        return parent?.let { Trace.child(name, it) } ?: Trace.root(name, this)
     }
 }

@@ -5,16 +5,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import runix.primitives.Reaction
-import runix.primitives.RunixJob
 import runix.primitives.RunixScheduler
 import runix.primitives.Signal
 import runix.primitives.tracing.ExecutionTrace
-import runix.primitives.tracing.child
 import runix.tracing.ExecutionStatus
-import runix.tracing.ExecutionTimer
-import runix.tracing.TraceLogEntry
+import runix.tracing.Trace
 import runix.tracing.TraceLogger
-import java.time.Instant
 
 class SignalRegistry(
     private val scheduler: RunixScheduler,
@@ -29,25 +25,13 @@ class SignalRegistry(
         val subscribedReactions = listeners[name].orEmpty()
 
         // Create trace for signal emission
-        val trace = ExecutionTrace(
-            path = (parentTrace?.path ?: emptyList()) + "Signal($name)",
-            parentId = parentTrace?.id,
-            scheduler = scheduler
-        )
+        val trace = if (parentTrace != null)
+            Trace.child("Signal($name)", parentTrace)
+        else
+            Trace.root("Signal($name)", scheduler)
 
         // Log the signal event
-        logger?.log(
-            TraceLogEntry(
-                id = trace.id,
-                parentId = trace.parentId,
-                type = "Signal",
-                name = name,
-                timestamp = Instant.now(),
-                durationMs = 0,
-                status = ExecutionStatus.Triggered,
-                tracePath = trace.path
-            )
-        )
+        Trace.log(trace, type = "Signal", status = ExecutionStatus.Triggered, logger = logger)
 
         scope.launch {
             signals[name]?.emit(Unit)

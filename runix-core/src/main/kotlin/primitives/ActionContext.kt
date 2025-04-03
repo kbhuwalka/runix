@@ -2,11 +2,10 @@ package runix.primitives
 
 import runix.core.logging.primitives.RunixExecutionContext
 import runix.primitives.tracing.ExecutionTrace
-import runix.primitives.tracing.child
 import runix.tracing.ExecutionStatus
-import runix.tracing.TraceLogEntry
-import java.time.Instant
+import runix.tracing.Trace
 import kotlin.time.Duration
+
 class ActionContext private constructor(
     private val base: RunixExecutionContext
 ) {
@@ -21,17 +20,17 @@ class ActionContext private constructor(
     // --- Child Execution Helpers ---
 
     suspend fun runChildAndWait(action: Action): ActionResult {
-        val childTrace = trace.child("Run")
+        val childTrace = Trace.child("Run", trace)
         return scheduler.runNowAndWait(action, childTrace)
     }
 
     fun scheduleChild(action: Action) {
-        val childTrace = trace.child("Schedule")
+        val childTrace = Trace.child("Schedule", trace)
         scheduler.schedule(action, childTrace)
     }
 
     fun fireSignal(signal: Signal) {
-        val childTrace = scheduler.childTraceFor("Signal", trace)
+        val childTrace = Trace.child("Signal", trace)
         scheduler.fireSignal(signal, childTrace)
     }
 
@@ -39,75 +38,25 @@ class ActionContext private constructor(
 
     internal fun logSuccess(name: String, message: String, duration: Duration) {
         trace.logSuccess(message)
-        logger?.log(
-            TraceLogEntry(
-                id = trace.id,
-                parentId = trace.parentId,
-                type = "Action",
-                name = name,
-                timestamp = Instant.now(),
-                durationMs = duration.inWholeMilliseconds,
-                status = ExecutionStatus.Success,
-                tracePath = trace.path,
-                context = mapOf("message" to message)
-            )
-        )
+        Trace.log(trace, type = "Action", status = ExecutionStatus.Success, logger = logger, message)
         traceManager.complete(trace.id, message)
     }
 
     internal fun logFailure(name: String, reason: String, recoverable: Boolean, duration: Duration) {
         trace.logFailure(reason, recoverable)
-        logger?.log(
-            TraceLogEntry(
-                id = trace.id,
-                parentId = trace.parentId,
-                type = "Action",
-                name = name,
-                timestamp = Instant.now(),
-                durationMs = duration.inWholeMilliseconds,
-                status = ExecutionStatus.Failure,
-                tracePath = trace.path,
-                context = mapOf(
-                    "message" to reason,
-                    "recoverable" to recoverable.toString()
-                )
-            )
-        )
+        Trace.log(trace, type = "Action", status = ExecutionStatus.Failure, logger = logger, message = reason)
         traceManager.complete(trace.id, "Failure")
     }
 
     internal fun logSkipped(name: String, reason: String) {
         trace.logSkipped(reason)
-        logger?.log(
-            TraceLogEntry(
-                id = trace.id,
-                parentId = trace.parentId,
-                type = "Action",
-                name = name,
-                timestamp = Instant.now(),
-                durationMs = 0,
-                status = ExecutionStatus.Skipped,
-                tracePath = trace.path,
-                context = mapOf("reason" to reason)
-            )
-        )
+        Trace.log(trace, type = "Action", status = ExecutionStatus.Skipped, logger = logger, message = reason)
         traceManager.complete(trace.id, "Skipped")
     }
 
     internal fun logTimeout(name: String, duration: Duration) {
         trace.logTimeout("Action [$name] timed out after $duration")
-        logger?.log(
-            TraceLogEntry(
-                id = trace.id,
-                parentId = trace.parentId,
-                type = "Action",
-                name = name,
-                timestamp = Instant.now(),
-                durationMs = duration.inWholeMilliseconds,
-                status = ExecutionStatus.Timeout,
-                tracePath = trace.path
-            )
-        )
+        Trace.log(trace, type = "Action", status = ExecutionStatus.Timeout, logger = logger, message = "Timed out after $duration")
         traceManager.complete(trace.id, "Timeout")
     }
 

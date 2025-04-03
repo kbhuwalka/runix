@@ -2,7 +2,7 @@ package runix.primitives
 
 import runix.core.logging.primitives.RunixExecutionContext
 import runix.primitives.tracing.ExecutionTrace
-import runix.primitives.tracing.child
+import runix.tracing.Trace
 
 class ReactionContext private constructor(
     private val base: RunixExecutionContext
@@ -13,12 +13,12 @@ class ReactionContext private constructor(
     private val scheduler = base.scheduler
 
     suspend fun runChildAndWait(action: Action): ActionResult {
-        val childTrace = trace.child("Run")
+        val childTrace = Trace.child("Run", trace)
         return scheduler.runNowAndWait(action, childTrace)
     }
 
     fun scheduleChild(action: Action) {
-        val childTrace = trace.child("Schedule")
+        val childTrace =Trace.child("Schedule", trace)
         scheduler.schedule(action, childTrace)
     }
 

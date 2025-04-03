@@ -34,9 +34,3 @@ data class ExecutionTrace(
         logger.warn { "⏰ [$this] Timeout: $reason" }
     }
 }
-
-fun ExecutionTrace.child(name: String): ExecutionTrace = ExecutionTrace(
-    parentId = this.id,
-    path = this.path + name,
-    scheduler = this.scheduler
-)
