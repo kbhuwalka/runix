@@ -4,8 +4,6 @@ object Reactions {
     val FailCalibration = Reaction(
         name = "FailCalibration",
         signalNames = listOf(RobotSignal.CalibrationFailed),
-        dependsOn = emptyList(),
-        condition = { true },
         onFired = { ctx ->
             BotState.isCalibrating.value = false
             println("❌ Calibration failed.")
@@ -15,8 +13,6 @@ object Reactions {
     val SucceedCalibration = Reaction(
         name = "SucceedCalibration",
         signalNames = listOf(RobotSignal.CalibrationSucceeded),
-        dependsOn = emptyList(),
-        condition = { true },
         onFired = { ctx ->
             BotState.isCalibrating.value = false
             println("✅ Calibration succeeded.")
@@ -26,8 +22,6 @@ object Reactions {
     val HandleOverheat = Reaction(
         name = "HandleOverheat",
         signalNames = listOf(RobotSignal.OverheatWarning),
-        dependsOn = emptyList(),
-        condition = { true },
         onFired = { ctx ->
             BotState.currentLocation.value = "dock"
             ctx.schedule(Announce("Overheat warning. Returning to dock."))
@@ -37,16 +31,12 @@ object Reactions {
     val HandleBatteryLow = Reaction(
         name = "HandleBatteryLow",
         signalNames = listOf(RobotSignal.BatteryLow),
-        dependsOn = emptyList(),
-        condition = { true },
         onFired = { ctx -> ctx.schedule(ChargeBattery()) }
     )
 
     val ResumeDelivery = Reaction(
         name = "ResumeDelivery",
         signalNames = listOf(RobotSignal.BatteryCharged),
-        dependsOn = emptyList(),
-        condition = { true },
         onFired = { ctx -> ctx.schedule(DeliverPackages()) }
     )
 }

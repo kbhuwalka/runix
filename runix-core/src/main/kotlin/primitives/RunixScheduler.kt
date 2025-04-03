@@ -115,7 +115,7 @@ class RunixScheduler(
     }
 
     private fun startStateListener(reaction: Reaction): Job {
-        val combinedFlow = combine(reaction.dependsOn.map { it.flow }) { values ->
+        val combinedFlow = combine(reaction.dependsOn.map { it }) { values ->
             Pair(values, reaction.condition())
         }
             .distinctUntilChanged { old, new -> old.second == new.second }
@@ -139,7 +139,7 @@ class RunixScheduler(
         val log = buildString {
             appendLine("🔁 Reaction [${reaction.name}] triggered.")
             reaction.dependsOn.forEachIndexed { i, flow ->
-                appendLine("  ↳ ${flow.name} = ${values.getOrNull(i)}")
+                appendLine("  ↳ ${flow} = ${values.getOrNull(i)}")
             }
         }
         logger.info { log }

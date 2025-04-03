@@ -1,5 +1,6 @@
 package runix.primitives
 
+import kotlinx.coroutines.flow.StateFlow
 import runix.core.logging.primitives.RunixExecutionContext
 import runix.primitives.tracing.ExecutionTrace
 import runix.tracing.ExecutionStatus
@@ -8,9 +9,9 @@ import runix.tracing.TraceLogEntry
 
 class Reaction(
     override val name: String,
-    val dependsOn: List<IRunixFlow<*>>,
+    val dependsOn: List<StateFlow<*>> = emptyList(),
     val signalNames: List<Signal> = emptyList(),
-    val condition: () -> Boolean,
+    val condition: () -> Boolean = {true},
     val onFired: suspend (ReactionContext) -> Unit
 ) : RunixExecutable {
 

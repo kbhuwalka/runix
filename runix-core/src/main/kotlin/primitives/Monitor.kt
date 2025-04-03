@@ -3,11 +3,13 @@ package runix.primitives
 import runix.core.logging.primitives.MonitorContext
 import runix.core.logging.primitives.RunixExecutionContext
 import runix.memory.TemporalExpression
+import kotlin.time.Duration
 
 abstract class Monitor(
     open val name: String,
     open val condition: TemporalExpression,
-    open val trigger: Signal
+    open val trigger: Signal,
+    open val throttleInterval: Duration? = null
 ) {
     open fun isEnabled(): Boolean = true
 
@@ -31,6 +33,10 @@ abstract class Monitor(
         }
 
         if (result) {
+            val throttle = throttleInterval
+            if (throttle != null && !MonitorThrottleRegistry.shouldEmit(name, throttle)) {
+                return
+            }
             onTriggered(context)
         } else {
             onSkipped(context)

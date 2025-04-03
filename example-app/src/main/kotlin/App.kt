@@ -33,12 +33,11 @@ suspend fun main() {
     delay(1000)
 
     println("\n🎯 [STEP 1] STARTING CALIBRATION")
+    BotState.currentSpeed.value = 3.0
     scheduler.schedule(CalibrateCamera())
 
     // Simulate low speed for monitor to trigger
-    delay(1500)
     println("🐢 Artificially slowing down to trigger low-speed monitor...")
-    BotState.currentSpeed.value = 3.0
     delay(6000)
     BotState.currentSpeed.value = 0.0 // simulate stop
 
@@ -49,7 +48,7 @@ suspend fun main() {
 
     delay(2000)
     println("🔥 [STEP 3] Simulating OVERHEAT condition")
-    BotState.temperature.value = 90.0
+    BotState.temperature.value = 900.0
     delay(11000) // long enough to trigger monitor
 
     println("❄️ Cooling system recovers...")

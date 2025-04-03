@@ -1,15 +1,24 @@
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import runix.primitives.MutableRunixFlow
-import runix.primitives.mutableRunixFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 
 // -------------- BotState --------------
 object BotState {
-    val isCalibrating = mutableRunixFlow("isCalibrating", false)
-    val isMoving = mutableRunixFlow("isMoving", false)
-    val currentSpeed = mutableRunixFlow("currentSpeed", 0.0)
-    val batteryLevel = mutableRunixFlow("batteryLevel", 100)
-    val isCharging = mutableRunixFlow("isCharging", false)
-    val deliveriesCompleted = mutableRunixFlow("deliveriesCompleted", 0)
-    val temperature = mutableRunixFlow("temperature", 60.0)
-    val currentLocation = mutableRunixFlow("currentLocation", "dock")
+    val isCalibrating = MutableStateFlow(false)
+    val isMoving = MutableStateFlow( false)
+    val currentSpeed = MutableStateFlow( 0.0)
+    val batteryLevel = MutableStateFlow(100)
+    val isCharging = MutableStateFlow( false)
+    val deliveriesCompleted = MutableStateFlow( 0)
+    val temperature = MutableStateFlow( 60.0)
+    val currentLocation = MutableStateFlow("dock")
+
+    val isLowSpeedDuringCalibration = isCalibrating
+        .combine(currentSpeed) { calibrating, speed ->
+            calibrating && speed < 5
+        }
+        .stateIn(CoroutineScope(Dispatchers.Default), SharingStarted.Eagerly, false)
 }

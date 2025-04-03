@@ -8,45 +8,42 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.INFINITE
 import kotlin.time.Duration.Companion.ZERO
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 class BooleanTracker(flow: Flow<Boolean>) {
-    private val timestamps = mutableListOf<Long>() // when true occurred
-    private var currentStartTime: Long? = null
-    private var lastTrueTime: Long? = null
+    private val timestamps = mutableListOf<TimeMark>()
+    private var currentStartMark: TimeMark? = null
+    private var lastTrueMark: TimeMark? = null
     private val clock = TimeSource.Monotonic
 
     init {
         CoroutineScope(Dispatchers.Default).launch {
             flow.collect { value ->
-                val now = clock.markNow().elapsedNow().inWholeMilliseconds
                 if (value) {
-                    if (currentStartTime == null) currentStartTime = now
-                    lastTrueTime = now
-                    timestamps.add(now)
+                    if (currentStartMark == null) {
+                        currentStartMark = clock.markNow()
+                    }
+                    lastTrueMark = clock.markNow()
+                    timestamps.add(clock.markNow())
                 } else {
-                    currentStartTime = null
+                    currentStartMark = null
                 }
             }
         }
     }
 
     fun getPersistedDuration(): Duration {
-        val now = clock.markNow().elapsedNow().inWholeMilliseconds
-        val start = currentStartTime ?: return ZERO
-        return (now - start).milliseconds
+        return currentStartMark?.elapsedNow() ?: Duration.ZERO
     }
 
     fun countInWindow(window: Duration): Int {
-        val now = clock.markNow().elapsedNow().inWholeMilliseconds
-        val cutoff = now - window.inWholeMilliseconds
-        timestamps.removeIf { it < cutoff }
-        return timestamps.count { it >= cutoff }
+        val now = clock.markNow()
+        timestamps.removeIf { it.elapsedNow() > window }
+        return timestamps.count()
     }
 
     fun timeSinceLastTrue(): Duration {
-        val now = clock.markNow().elapsedNow().inWholeMilliseconds
-        val last = lastTrueTime ?: return INFINITE
-        return (now - last).milliseconds
+        return lastTrueMark?.elapsedNow() ?: Duration.INFINITE
     }
 }
