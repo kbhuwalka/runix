@@ -1,36 +1,49 @@
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
-import runix.memory.persistsFor
-import runix.primitives.Monitor
+import kotlinx.coroutines.flow.onEach
+import runix.dsl.monitor
+import runix.memory.persistedFor
 import kotlin.time.Duration.Companion.seconds
 
 object Monitors {
-    fun LowSpeedDuringCalibration() = object : Monitor(
-        name = "LowSpeedDuringCalibration",
-        condition = {
-            BotState.isLowSpeedDuringCalibration.persistsFor(2.seconds, "low_speed_calibration")()
-        },
-        trigger = RobotSignal.CalibrationWarning,
-        throttleInterval = 20.seconds
-    ) {}
+    fun LowSpeedDuringCalibration() = monitor("LowSpeedDuringCalibration") {
+        dependsOn(BotState.isCalibrating, BotState.currentSpeed)
 
-    fun OverheatMonitor() = object : Monitor(
-        name = "OverheatMonitor",
-        condition =  BotState.temperature
-                        .map { it > 85 }
-                        .persistsFor(3.seconds, "temperature"),
-        trigger = RobotSignal.OverheatWarning,
-        throttleInterval = 20.seconds
-    ) {}
+        condition {
+            BotState.isLowSpeedDuringCalibration
+                .persistedFor(2.seconds, key = "low_speed_calibration")
+                .invoke()
+        }
 
-    fun BatteryMonitor() = object : Monitor(
-        name = "BatteryLow",
-        condition = {
+        throttle(20.seconds)
+        trigger(RobotSignal.CalibrationWarning)
+    }
+
+    fun OverheatMonitor() = monitor("OverheatMonitor") {
+        dependsOn(BotState.temperature)
+
+        condition {
+            BotState.temperature
+                .map { it > 85 }
+                .persistedFor(3.seconds, key = "temperature")
+                .invoke()
+        }
+
+        throttle(1.seconds)
+        trigger(RobotSignal.OverheatWarning)
+    }
+
+    fun BatteryMonitor() = monitor("BatteryLow") {
+        dependsOn(BotState.batteryLevel)
+
+        condition {
             BotState.batteryLevel
                 .map { it < 25 }
-                .persistsFor(1.seconds, "low_battery")()
-        },
-        trigger = RobotSignal.BatteryLow,
-        throttleInterval = 20.seconds
-    ) {}
+                .persistedFor(1.seconds, key = "low_battery")
+                .invoke()
+        }
+
+        throttle(10.seconds)
+        trigger(RobotSignal.BatteryLow)
+    }
 }

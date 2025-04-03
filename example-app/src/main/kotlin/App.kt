@@ -49,7 +49,7 @@ suspend fun main() {
     delay(2000)
     println("🔥 [STEP 3] Simulating OVERHEAT condition")
     BotState.temperature.value = 900.0
-    delay(11000) // long enough to trigger monitor
+    delay(5000) // long enough to trigger monitor
 
     println("❄️ Cooling system recovers...")
     BotState.temperature.value = 70.0

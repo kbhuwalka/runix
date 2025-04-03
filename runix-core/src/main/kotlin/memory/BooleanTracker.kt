@@ -4,18 +4,17 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import runix.memory.ConditionEval
+import java.time.Instant
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.INFINITE
-import kotlin.time.Duration.Companion.ZERO
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 class BooleanTracker(flow: Flow<Boolean>) {
-    private val timestamps = mutableListOf<TimeMark>()
-    private var currentStartMark: TimeMark? = null
-    private var lastTrueMark: TimeMark? = null
+    private val timestamps = mutableListOf<TimeSource.Monotonic.ValueTimeMark>()
+    private var currentStartMark: TimeSource.Monotonic.ValueTimeMark? = null
+    private var lastTrueMark: TimeSource.Monotonic.ValueTimeMark? = null
     private val clock = TimeSource.Monotonic
+    private val wallClock = java.time.Clock.systemUTC()
 
     init {
         CoroutineScope(Dispatchers.Default).launch {
@@ -33,8 +32,14 @@ class BooleanTracker(flow: Flow<Boolean>) {
         }
     }
 
-    fun getPersistedDuration(): Duration {
-        return currentStartMark?.elapsedNow() ?: Duration.ZERO
+    fun evaluatePersistence(duration: Duration): ConditionEval {
+        val persisted = currentStartMark?.elapsedNow() ?: return ConditionEval.False
+        return if (persisted >= duration) {
+            ConditionEval.True
+        } else {
+            val nextCheckAt = Instant.now(wallClock).plusMillis((duration - persisted).inWholeMilliseconds)
+            ConditionEval.Delayed(nextCheckAt)
+        }
     }
 
     fun countInWindow(window: Duration): Int {

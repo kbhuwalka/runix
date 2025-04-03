@@ -6,11 +6,13 @@ import kotlinx.coroutines.flow.*
 import runix.core.lifecycle.Disposable
 import runix.core.logger
 import runix.core.logging.primitives.RunixExecutionContext
+import runix.memory.ConditionEval
 import runix.primitives.internal.SignalRegistry
 import runix.primitives.tracing.ExecutionTrace
 import runix.tracing.LiveTraceManager
 import runix.tracing.Trace
 import runix.tracing.TraceLogger
+import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
 class RunixScheduler(
@@ -25,7 +27,9 @@ class RunixScheduler(
     private val runningJobs = ConcurrentHashMap.newKeySet<String>()
     private val queuedJobs = ConcurrentHashMap.newKeySet<String>()
 
-    private val signalRegistry = SignalRegistry(this, logger = traceLogger)
+    private val pendingRechecks = mutableMapOf<String, Job>()
+
+    private val signalRegistry = SignalRegistry(this, traceLogger = traceLogger)
 
     fun start() {
         coroutineScope.launch {
@@ -80,32 +84,19 @@ class RunixScheduler(
 
     // Register a Reaction with state and signal watchers
     fun register(reaction: Reaction): Disposable {
-        val stateJob = startStateListener(reaction)
+        val registeredSignals = reaction.signalNames
 
-        reaction.signalNames.forEach { signalRegistry.subscribe(it, reaction) }
+        registeredSignals.forEach { signalRegistry.subscribe(it, reaction) }
 
         return object : Disposable {
             override fun dispose() {
-                stateJob.cancel()
+                registeredSignals.forEach { signalRegistry.unsubscribe(it, reaction) }
             }
         }
     }
 
     fun register(monitor: Monitor): Disposable {
-        val stateJob = CoroutineScope(Dispatchers.Default).launch {
-            while (isActive) {
-                delay(1000) // or whatever polling/check interval
-                val context = RunixExecutionContext(
-                    trace = ExecutionTrace(
-                        path = listOf("Monitor(${monitor.name})"),
-                        scheduler = this@RunixScheduler
-                    ),
-                    scheduler = this@RunixScheduler,
-                    awaiter = null
-                )
-                monitor.evaluateWithContext(context)
-            }
-        }
+        val stateJob = startStateListener(monitor)
 
         return object : Disposable {
             override fun dispose() {
@@ -114,35 +105,45 @@ class RunixScheduler(
         }
     }
 
-    private fun startStateListener(reaction: Reaction): Job {
-        val combinedFlow = combine(reaction.dependsOn.map { it }) { values ->
-            Pair(values, reaction.condition())
-        }
-            .distinctUntilChanged { old, new -> old.second == new.second }
-            .filter { it.second }
-            .map { it.first }
+    private fun startStateListener(monitor: Monitor): Job {
+        val combinedFlow = monitor.dependsOn
+            .map { it.map { Unit } }
+            .merge()
 
         return coroutineScope.launch {
-            combinedFlow.collectLatest { values ->
-                val trace = ExecutionTrace(
-                    parentId = null,
-                    path = listOf(reaction.name),
-                    scheduler = this@RunixScheduler
-                )
-                logReactionTrigger(reaction, values)
-                schedule(RunixJob(reaction, trace))
+            combinedFlow.collectLatest {
+                val trace = Trace.root("Monitor(${monitor.name})", this@RunixScheduler)
+                val ctx = RunixExecutionContext(trace, this@RunixScheduler, null)
+
+                when (val result = monitor.condition()) {
+                    is ConditionEval.True -> {
+                        pendingRechecks.remove(monitor.name)?.cancel()
+                        monitor.evaluateWithContext(ctx)
+                    }
+
+                    is ConditionEval.Delayed -> {
+                        pendingRechecks.remove(monitor.name)?.cancel() // cancel before scheduling next
+                        pendingRechecks[monitor.name] = scheduleMonitorRecheck(monitor, result.nextCheckAt)
+                    }
+
+                    is ConditionEval.False -> {
+                        pendingRechecks.remove(monitor.name)?.cancel() // 🔥 Only here should we cancel without rescheduling
+                    }
+                }
             }
         }
     }
 
-    private fun logReactionTrigger(reaction: Reaction, values: Array<Any?>) {
-        val log = buildString {
-            appendLine("🔁 Reaction [${reaction.name}] triggered.")
-            reaction.dependsOn.forEachIndexed { i, flow ->
-                appendLine("  ↳ ${flow} = ${values.getOrNull(i)}")
-            }
+    private fun scheduleMonitorRecheck(monitor: Monitor, at: Instant): Job {
+        val delayMs = at.toEpochMilli() - System.currentTimeMillis()
+        if (delayMs <= 0) return Job() // noop
+
+        return coroutineScope.launch {
+            delay(delayMs)
+            val trace = Trace.root("MonitorRecheck(${monitor.name})", this@RunixScheduler)
+            val ctx = RunixExecutionContext(trace, this@RunixScheduler, null)
+            monitor.evaluateWithContext(ctx)
         }
-        logger.info { log }
     }
 
     // === Convenience overloads ===

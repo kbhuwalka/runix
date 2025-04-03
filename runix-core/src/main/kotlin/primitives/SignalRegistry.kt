@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
+import runix.core.logger
 import runix.primitives.Reaction
 import runix.primitives.RunixScheduler
 import runix.primitives.Signal
@@ -15,7 +16,7 @@ import runix.tracing.TraceLogger
 class SignalRegistry(
     private val scheduler: RunixScheduler,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default),
-    private val logger: TraceLogger? = null
+    private val traceLogger: TraceLogger? = null
 ) {
     private val signals = mutableMapOf<String, MutableSharedFlow<Unit>>()
     private val listeners = mutableMapOf<String, MutableList<Reaction>>()
@@ -31,7 +32,7 @@ class SignalRegistry(
             Trace.root("Signal($name)", scheduler)
 
         // Log the signal event
-        Trace.log(trace, type = "Signal", status = ExecutionStatus.Triggered, logger = logger)
+        Trace.log(trace, type = "Signal", status = ExecutionStatus.Triggered, logger = traceLogger)
 
         scope.launch {
             signals[name]?.emit(Unit)
@@ -49,6 +50,15 @@ class SignalRegistry(
     }
 
     fun subscribe(signal: Signal, reaction: Reaction) {
+        logger.info { "🔗 Subscribed reaction '${reaction.name}' to signal '${signal.name}'" }
         listeners.getOrPut(signal.name) { mutableListOf() }.add(reaction)
+    }
+
+    fun unsubscribe(signal: Signal, reaction: Reaction) {
+        listeners[signal.name]?.apply {
+            remove(reaction)
+            logger.info { "❌ Unsubscribed reaction '${reaction.name}' from signal '${signal.name}'" }
+            if (isEmpty()) listeners.remove(signal.name)
+        }
     }
 }

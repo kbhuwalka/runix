@@ -7,13 +7,12 @@ import runix.tracing.ExecutionStatus
 import runix.tracing.ExecutionTimer
 import runix.tracing.TraceLogEntry
 
-class Reaction(
+abstract class Reaction protected constructor(
     override val name: String,
-    val dependsOn: List<StateFlow<*>> = emptyList(),
     val signalNames: List<Signal> = emptyList(),
-    val condition: () -> Boolean = {true},
-    val onFired: suspend (ReactionContext) -> Unit
 ) : RunixExecutable {
+
+    abstract suspend fun onFired(context: ReactionContext)
 
     override suspend fun runWithContext(context: RunixExecutionContext) {
         val trace = context.trace

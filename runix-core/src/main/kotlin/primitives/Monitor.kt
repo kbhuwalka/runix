@@ -1,13 +1,16 @@
 package runix.primitives
 
+import kotlinx.coroutines.flow.StateFlow
 import runix.core.logging.primitives.MonitorContext
 import runix.core.logging.primitives.RunixExecutionContext
+import runix.memory.ConditionEval
 import runix.memory.TemporalExpression
 import kotlin.time.Duration
 
-abstract class Monitor(
+abstract class Monitor protected constructor(
     open val name: String,
-    open val condition: TemporalExpression,
+    open val dependsOn: List<StateFlow<*>>,
+    open val condition: () -> ConditionEval,
     open val trigger: Signal,
     open val throttleInterval: Duration? = null
 ) {
@@ -32,14 +35,24 @@ abstract class Monitor(
             return
         }
 
-        if (result) {
-            val throttle = throttleInterval
-            if (throttle != null && !MonitorThrottleRegistry.shouldEmit(name, throttle)) {
-                return
+        when (result) {
+            is ConditionEval.True -> {
+                val throttle = throttleInterval
+                if (throttle != null && !MonitorThrottleRegistry.shouldEmit(name, throttle)) {
+                    context.logSkipped(name, "Throttled due to $throttle")
+                    return
+                }
+                onTriggered(context)
             }
-            onTriggered(context)
-        } else {
-            onSkipped(context)
+
+            is ConditionEval.False -> {
+                onSkipped(context)
+            }
+
+            is ConditionEval.Delayed -> {
+                // No-op: scheduler will handle rescheduling
+                onSkipped(context)
+            }
         }
     }
 }
