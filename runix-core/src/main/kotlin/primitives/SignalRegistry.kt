@@ -24,13 +24,14 @@ class SignalRegistry(
     private val signals = mutableMapOf<String, MutableSharedFlow<Unit>>()
     private val listeners = mutableMapOf<String, MutableList<Reaction>>()
 
-    fun fire(signal: Signal) {
+    fun fire(signal: Signal, parentTrace: ExecutionTrace? = null) {
         val name = signal.name
         val subscribedReactions = listeners[name].orEmpty()
 
         // Create trace for signal emission
         val trace = ExecutionTrace(
-            path = listOf("Signal($name)"),
+            path = (parentTrace?.path ?: emptyList()) + "Signal($name)",
+            parentId = parentTrace?.id,
             scheduler = scheduler
         )
 
@@ -38,7 +39,7 @@ class SignalRegistry(
         logger?.log(
             TraceLogEntry(
                 id = trace.id,
-                parentId = null,
+                parentId = trace.parentId,
                 type = "Signal",
                 name = name,
                 timestamp = Instant.now(),
@@ -53,7 +54,7 @@ class SignalRegistry(
         }
 
         subscribedReactions.forEach { reaction ->
-            scheduler.schedule(reaction)
+            scheduler.schedule(reaction, trace)
         }
     }
 

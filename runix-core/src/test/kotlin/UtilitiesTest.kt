@@ -7,5 +7,5 @@ import kotlinx.serialization.encodeToString
 import dev.runix.utils.*
 
 internal class PrinterTest {
-    
+
 }

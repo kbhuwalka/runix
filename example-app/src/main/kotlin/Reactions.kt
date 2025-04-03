@@ -1,145 +1,52 @@
-package demo.CleanBot
-
-import BotState
-import DropFailed
-import DropSucceeded
-import FallbackNavigationFailed
-import GripperFailed
-import MotorFailed
-import NavigationFailed
-import StartDelivery
 import runix.primitives.Reaction
 
 object Reactions {
-
-    val StartOnCommand = Reaction(
-        name = "Reaction(StartOnCommand)",
-        signalNames = listOf(StartDelivery),
+    val FailCalibration = Reaction(
+        name = "FailCalibration",
+        signalNames = listOf(RobotSignal.CalibrationFailed),
         dependsOn = emptyList(),
         condition = { true },
         onFired = { ctx ->
-            ctx.runAll(
-                Announce("🚀 Starting delivery"),
-                StartDeliverySequence
-            )
+            BotState.isCalibrating.value = false
+            println("❌ Calibration failed.")
         }
     )
 
-    val DropFailedHandler = Reaction(
-        name = "Reaction(DropFailedHandler)",
-        signalNames = listOf(DropFailed),
+    val SucceedCalibration = Reaction(
+        name = "SucceedCalibration",
+        signalNames = listOf(RobotSignal.CalibrationSucceeded),
         dependsOn = emptyList(),
         condition = { true },
         onFired = { ctx ->
-            ctx.runAll(
-                Announce("❌ Drop failed. Retrying..."),
-                DropPackage
-            )
+            BotState.isCalibrating.value = false
+            println("✅ Calibration succeeded.")
         }
     )
 
-    val RetryDropEscalation = Reaction(
-        name = "Reaction(RetryEscalation)",
-        signalNames = listOf(DropFailed),
-        dependsOn = listOf(BotState.dropSuccessful),
-        condition = { !BotState.dropSuccessful.value },
-        onFired = { ctx ->
-            ctx.runAll(
-                Announce("⚠️ Retrying failed. Going to fallback."),
-                NavigateToFallback,
-                DropPackage
-            )
-        }
-    )
-
-    val MotorFailureHandler = Reaction(
-        name = "Reaction(MotorFailure)",
-        signalNames = listOf(MotorFailed),
-        dependsOn = listOf(),
+    val HandleOverheat = Reaction(
+        name = "HandleOverheat",
+        signalNames = listOf(RobotSignal.OverheatWarning),
+        dependsOn = emptyList(),
         condition = { true },
         onFired = { ctx ->
-            ctx.runAll(
-                Announce("🛑 Motor failed. Returning to base."),
-                ReturnToDock
-            )
+            BotState.currentLocation.value = "dock"
+            ctx.scheduleChild(Announce("Overheat warning. Returning to dock."))
         }
     )
 
-    val GripperFailureHandler = Reaction(
-        name = "Reaction(GripperFailure)",
-        signalNames = listOf(GripperFailed),
-        dependsOn = listOf(),
+    val HandleBatteryLow = Reaction(
+        name = "HandleBatteryLow",
+        signalNames = listOf(RobotSignal.BatteryLow),
+        dependsOn = emptyList(),
         condition = { true },
-        onFired = { ctx ->
-            ctx.runAll(
-                Announce("🔧 Gripper jammed. Attempting restart."),
-                ActivateGripper
-            )
-        }
+        onFired = { ctx -> ctx.scheduleChild(ChargeBattery()) }
     )
 
-    val DropSuccessWrapUp = Reaction(
-        name = "Reaction(WrapUp)",
-        signalNames = listOf(DropSucceeded),
-        dependsOn = listOf(),
+    val ResumeDelivery = Reaction(
+        name = "ResumeDelivery",
+        signalNames = listOf(RobotSignal.BatteryCharged),
+        dependsOn = emptyList(),
         condition = { true },
-        onFired = { ctx ->
-            ctx.runAll(
-                Announce("✅ Package delivered. Returning to dock."),
-                ReturnToDock
-            )
-        }
+        onFired = { ctx -> ctx.scheduleChild(DeliverPackages()) }
     )
-
-    val BatteryLowInterruption = Reaction(
-        name = "Reaction(BatteryLowHandler)",
-        dependsOn = listOf(BotState.batteryLevel),
-        condition = { BotState.batteryLevel.value < 20 },
-        onFired = { ctx ->
-            ctx.runAll(
-                Announce("🔋 Battery low. Docking to charge."),
-                ReturnToDock,
-                ChargeBattery
-            )
-        }
-    )
-
-    val EscalateAfterDropFails = Reaction(
-        name = "Reaction(EscalateAfterDropFails)",
-        dependsOn = listOf(BotState.dropAttempts),
-        condition = { BotState.dropAttempts.value >= 3 && !BotState.dropSuccessful.value },
-        onFired = { ctx ->
-            ctx.runAll(
-                Announce("🚨 Drop failed 3 times. Escalating."),
-                ReturnToDock
-            )
-        }
-    )
-
-    val FallbackNavFailure = Reaction(
-        name = "Reaction(FallbackNavFailure)",
-        signalNames = listOf(FallbackNavigationFailed),
-        dependsOn = listOf(BotState.currentZone),
-        condition = { BotState.currentZone.value == "fallback" },
-        onFired = { ctx ->
-            ctx.runAll(
-                Announce("🧯 Fallback nav failed. Returning to dock."),
-                ReturnToDock
-            )
-        }
-    )
-
-    val HandleNavigationFailure = Reaction(
-        name = "Reaction(HandleNavigationFailure)",
-        signalNames = listOf(NavigationFailed),
-        dependsOn = listOf(BotState.currentZone),
-        condition = { BotState.currentZone.value != "fallback" },
-        onFired = { ctx ->
-            ctx.runAll(
-                Announce("⚠️ Navigation failed. Retrying main drop zone."),
-                NavigateToDropZone
-            )
-        }
-    )
-
 }

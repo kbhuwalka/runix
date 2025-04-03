@@ -4,13 +4,13 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import runix.core.lifecycle.Disposable
-import runix.core.logging.logger
+import runix.core.logger
+import runix.core.logging.primitives.RunixExecutionContext
 import runix.primitives.internal.SignalRegistry
 import runix.primitives.tracing.ExecutionTrace
 import runix.tracing.LiveTraceManager
 import runix.tracing.TraceLogger
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.sign
 
 class RunixScheduler(
     private val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
@@ -73,8 +73,8 @@ class RunixScheduler(
         job.run(this)
     }
 
-    fun fireSignal(signal: Signal) {
-        signalRegistry.fire(signal)
+    fun fireSignal(signal: Signal, parentTrace: ExecutionTrace? = null) {
+        signalRegistry.fire(signal, parentTrace)
     }
 
     // Register a Reaction with state and signal watchers
@@ -82,6 +82,29 @@ class RunixScheduler(
         val stateJob = startStateListener(reaction)
 
         reaction.signalNames.forEach { signalRegistry.subscribe(it, reaction) }
+
+        return object : Disposable {
+            override fun dispose() {
+                stateJob.cancel()
+            }
+        }
+    }
+
+    fun register(monitor: Monitor): Disposable {
+        val stateJob = CoroutineScope(Dispatchers.Default).launch {
+            while (isActive) {
+                delay(1000) // or whatever polling/check interval
+                val context = RunixExecutionContext(
+                    trace = ExecutionTrace(
+                        path = listOf("Monitor(${monitor.name})"),
+                        scheduler = this@RunixScheduler
+                    ),
+                    scheduler = this@RunixScheduler,
+                    awaiter = null
+                )
+                monitor.evaluateWithContext(context)
+            }
+        }
 
         return object : Disposable {
             override fun dispose() {
@@ -143,7 +166,7 @@ class RunixScheduler(
         return waiter.await()
     }
 
-    private fun childTraceFor(name: String, parent: ExecutionTrace?): ExecutionTrace {
+    internal fun childTraceFor(name: String, parent: ExecutionTrace?): ExecutionTrace {
         return ExecutionTrace(
             parentId = parent?.id,
             path = parent?.path.orEmpty() + name,

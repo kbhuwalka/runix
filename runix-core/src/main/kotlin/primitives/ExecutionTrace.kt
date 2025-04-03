@@ -1,6 +1,6 @@
 package runix.primitives.tracing
 
-import runix.core.logging.logger
+import runix.core.logger
 import runix.primitives.RunixScheduler
 import java.util.concurrent.atomic.AtomicLong
 

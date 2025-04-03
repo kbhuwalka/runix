@@ -1,69 +1,73 @@
-package demo.CleanBot
-
-import BotState
-import DropFailed
-import MotorFailed
-import StartDelivery
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
 import runix.primitives.RunixScheduler
 import runix.tools.TimelineViewer
 import runix.tracing.FileTraceLogger
 import runix.tracing.tools.TraceVisualizer
 import java.io.File
 
-fun main() = runBlocking {
+suspend fun main() {
     println("🚀 Booting WarehouseBot Brain...")
     val logger = FileTraceLogger(File("logs"))
     val scheduler = RunixScheduler(traceLogger = logger)
-    scheduler.start()
 
     val handles = listOf(
-        scheduler.register(Reactions.StartOnCommand),
-        scheduler.register(Reactions.DropFailedHandler),
-        scheduler.register(Reactions.RetryDropEscalation),
-        scheduler.register(Reactions.MotorFailureHandler),
-        scheduler.register(Reactions.GripperFailureHandler),
-        scheduler.register(Reactions.DropSuccessWrapUp),
-        scheduler.register(Reactions.BatteryLowInterruption),
-        scheduler.register(Reactions.FallbackNavFailure),
-        scheduler.register(Reactions.EscalateAfterDropFails),
-        scheduler.register(Reactions.HandleNavigationFailure)
+        scheduler.register(Monitors.LowSpeedDuringCalibration()),
+        scheduler.register(Monitors.OverheatMonitor()),
+        scheduler.register(Monitors.BatteryMonitor()),
+        scheduler.register(Reactions.FailCalibration),
+        scheduler.register(Reactions.SucceedCalibration),
+        scheduler.register(Reactions.HandleOverheat),
+        scheduler.register(Reactions.HandleBatteryLow),
+        scheduler.register(Reactions.ResumeDelivery)
     )
 
+    scheduler.start()
+
+    println("🧠 SYSTEM BOOTING...")
+    BotState.batteryLevel.value = 100
+    BotState.temperature.value = 60.0
+    BotState.currentLocation.value = "dock"
+    BotState.isCalibrating.value = false
+    BotState.isMoving.value = false
+
     delay(1000)
 
-    println("\n🧠 [User] Starting delivery")
-    scheduler.fireSignal(StartDelivery)
+    println("\n🎯 [STEP 1] STARTING CALIBRATION")
+    scheduler.schedule(CalibrateCamera())
+
+    // Simulate low speed for monitor to trigger
+    delay(1500)
+    println("🐢 Artificially slowing down to trigger low-speed monitor...")
+    BotState.currentSpeed.value = 3.0
+    delay(6000)
+    BotState.currentSpeed.value = 0.0 // simulate stop
+
+    delay(1000)
+
+    println("\n📦 [STEP 2] BEGINNING PACKAGE DELIVERY")
+    scheduler.schedule(DeliverPackages())
 
     delay(2000)
+    println("🔥 [STEP 3] Simulating OVERHEAT condition")
+    BotState.temperature.value = 90.0
+    delay(11000) // long enough to trigger monitor
 
-    println("\n⚡ [System] Simulating gradual battery drain")
-    BotState.batteryLevel.value = 50
-    delay(1000)
-    BotState.batteryLevel.value = 30
-    delay(1000)
-    BotState.batteryLevel.value = 18
+    println("❄️ Cooling system recovers...")
+    BotState.temperature.value = 70.0
+    delay(2000)
 
-    delay(5000)
+    println("\n🔋 [STEP 4] Simulating LOW BATTERY condition")
+    BotState.batteryLevel.value = 20
+    delay(16000) // long enough to trigger BatteryLow
 
-    println("\n🎯 [Sim] Faking drop failure and retry")
-    scheduler.fireSignal(DropFailed)
+    println("\n⚡ [STEP 5] Battery charges...")
+    delay(6000) // enough for ChargeBattery + ResumeDelivery
 
-    delay(4000)
+    println("\n📦 [STEP 6] Continuing delivery...")
+    scheduler.schedule(DeliverPackages())
+    delay(6000)
 
-    println("\n🔧 [Sim] Faking motor failure (should cancel delivery)")
-    scheduler.fireSignal(MotorFailed)
-
-    delay(3000)
-
-    println("\n🧼 [Reset] Resuming delivery after fix")
-    BotState.batteryLevel.value = 85
-    scheduler.fireSignal(StartDelivery)
-
-    delay(5000)
-
-    println("\n✅ Simulation complete. Shutting down WarehouseBot.")
+    println("\n✅ [STEP 7] Simulation complete.")
     handles.forEach { it.dispose() }
 
     val logFile = logger.getLogFile()

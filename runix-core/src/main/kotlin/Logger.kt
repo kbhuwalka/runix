@@ -1,4 +1,4 @@
-package runix.core.logging
+package runix.core
 
 import mu.KotlinLogging
 

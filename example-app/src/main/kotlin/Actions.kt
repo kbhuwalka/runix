@@ -1,109 +1,81 @@
-package demo.CleanBot
-
-import BotState
-import DropFailed
-import DropSucceeded
-import GripperFailed
-import MotorFailed
-import NavigationFailed
 import kotlinx.coroutines.delay
-import runix.primitives.*
-import kotlin.random.Random
+import runix.primitives.Action
+import runix.primitives.ActionContext
+import runix.primitives.ActionResult
 
-object StartMotor : Action("StartMotor") {
+class Announce(private val message: String) : Action("Announce") {
     override suspend fun onExecute(context: ActionContext): ActionResult {
-        delay(500)
-        return if (Random.nextDouble() < 0.9) {
-            ActionResult.Success("Motor started")
-        } else {
-            context.fireSignal(MotorFailed)
-            ActionResult.Failure("Motor failed", recoverable = false)
-        }
-    }
-}
-
-object ActivateGripper : Action("ActivateGripper") {
-    override suspend fun onExecute(context: ActionContext): ActionResult {
-        delay(400)
-        return if (Random.nextBoolean()) {
-            ActionResult.Success("Gripper activated")
-        } else {
-            context.fireSignal(GripperFailed)
-            ActionResult.Failure("Gripper jammed", recoverable = true)
-        }
-    }
-}
-
-object NavigateToDropZone : Action("NavigateToDropZone") {
-    override suspend fun onExecute(context: ActionContext): ActionResult {
-        delay(800)
-        return if (Random.nextDouble() < 0.85) {
-            BotState.currentZone.value = "drop"
-            ActionResult.Success("Reached drop zone")
-        } else {
-            context.fireSignal(NavigationFailed)
-            ActionResult.Failure("Couldn't reach drop zone")
-        }
-    }
-}
-
-object DropPackage : Action("DropPackage") {
-    override suspend fun onExecute(context: ActionContext): ActionResult {
-        delay(600)
-        return if (Random.nextDouble() < 0.75) {
-            BotState.dropSuccessful.value = true
-            BotState.dropAttempts.value += 1
-            context.fireSignal(DropSucceeded)
-            ActionResult.Success("Dropped package")
-        } else {
-            context.fireSignal(DropFailed)
-            ActionResult.Failure("Drop failed", recoverable = true)
-        }
-    }
-}
-
-object NavigateToFallback : Action("NavigateToFallback") {
-    override suspend fun onExecute(context: ActionContext): ActionResult {
-        delay(1000)
-        BotState.currentZone.value = "fallback"
-        return ActionResult.Success("Fallback reached")
-    }
-}
-
-object ReturnToDock : Action("ReturnToDock") {
-    override suspend fun onExecute(context: ActionContext): ActionResult {
-        delay(700)
-        return ActionResult.Success("Returned to dock")
-    }
-}
-
-object ChargeBattery : Action("ChargeBattery") {
-    override suspend fun onExecute(context: ActionContext): ActionResult {
-        repeat(5) {
-            delay(400)
-            BotState.batteryLevel.value += 10
-        }
-        return ActionResult.Success("Battery charged")
-    }
-}
-
-class Announce(private val message: String) : Action("Announce($message)") {
-
-    override suspend fun onExecute(context: ActionContext): ActionResult {
-        println("📣 $message")
+        println("📢 Announcement: $message")
         return ActionResult.Success()
     }
 }
 
-object StartDeliverySequence : Action("StartDeliverySequence") {
+class StartMotors : Action("StartMotors") {
     override suspend fun onExecute(context: ActionContext): ActionResult {
-        val motor = context.runChildAndWait(StartMotor)
-        if (motor is ActionResult.Failure) return motor
+        delay(500)
+        val failed = Math.random() < 0.3
+        if (failed) {
+            BotState.currentSpeed.value = 2.0
+            return ActionResult.Failure("Motor failed")
+        }
+        BotState.currentSpeed.value = 6.0
+        BotState.isMoving.value = true
+        return ActionResult.Success()
+    }
+}
 
-        val nav = context.runChildAndWait(NavigateToDropZone)
-        if (nav is ActionResult.Failure) return nav
+class CalibrateCamera : Action("CalibrateCamera") {
+    override suspend fun onExecute(context: ActionContext): ActionResult {
+        BotState.isCalibrating.value = true
+        context.fireSignal(RobotSignal.CalibrationStarted)
+        delay(1000)
+        val motors = context.runChildAndWait(StartMotors())
+        delay(3000)
+        return if (motors is ActionResult.Success) {
+            context.fireSignal(RobotSignal.CalibrationSucceeded)
+            ActionResult.Success()
+        } else {
+            context.fireSignal(RobotSignal.CalibrationFailed)
+            ActionResult.Failure("Calibration failed")
+        }
+    }
+}
 
-        val drop = context.runChildAndWait(DropPackage)
-        return drop
+class DeliverPackage : Action("DeliverPackage") {
+    override suspend fun onExecute(context: ActionContext): ActionResult {
+        delay(500)
+        val success = Math.random() < 0.8
+        if (success) {
+            BotState.deliveriesCompleted.value += 1
+            context.fireSignal(RobotSignal.DeliverySuccess)
+            return ActionResult.Success()
+        }
+        return ActionResult.Failure("Delivery failed")
+    }
+}
+
+class DeliverPackages : Action("DeliverPackages") {
+    override suspend fun onExecute(context: ActionContext): ActionResult {
+        repeat(5) {
+            val result = context.runChildAndWait(DeliverPackage())
+            delay(1000)
+            BotState.temperature.value += (-2..5).random()
+            BotState.batteryLevel.value -= (2..4).random()
+            if (result is ActionResult.Failure) return result
+        }
+        return ActionResult.Success()
+    }
+}
+
+class ChargeBattery : Action("ChargeBattery") {
+    override suspend fun onExecute(context: ActionContext): ActionResult {
+        BotState.isCharging.value = true
+        repeat(5) {
+            delay(400)
+            BotState.batteryLevel.value += 10
+        }
+        BotState.isCharging.value = false
+        context.fireSignal(RobotSignal.BatteryCharged)
+        return ActionResult.Success("Battery charged")
     }
 }

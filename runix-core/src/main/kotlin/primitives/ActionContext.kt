@@ -31,7 +31,8 @@ class ActionContext private constructor(
     }
 
     fun fireSignal(signal: Signal) {
-        scheduler.fireSignal(signal)
+        val childTrace = scheduler.childTraceFor("Signal", trace)
+        scheduler.fireSignal(signal, childTrace)
     }
 
     // --- Internal Logging Helpers ---
