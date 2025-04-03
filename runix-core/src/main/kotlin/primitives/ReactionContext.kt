@@ -12,12 +12,12 @@ class ReactionContext private constructor(
     // Internal only
     private val scheduler = base.scheduler
 
-    suspend fun runChildAndWait(action: Action): ActionResult {
+    suspend fun runAndWait(action: Action): ActionResult {
         val childTrace = Trace.child("Run", trace)
         return scheduler.runNowAndWait(action, childTrace)
     }
 
-    fun scheduleChild(action: Action) {
+    fun schedule(action: Action) {
         val childTrace =Trace.child("Schedule", trace)
         scheduler.schedule(action, childTrace)
     }
@@ -27,7 +27,7 @@ class ReactionContext private constructor(
     }
 
     fun runAll(vararg actions: Action) {
-        actions.forEach { scheduleChild(it) }
+        actions.forEach { schedule(it) }
     }
 
     companion object {

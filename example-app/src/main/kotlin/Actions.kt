@@ -29,7 +29,7 @@ class CalibrateCamera : Action("CalibrateCamera") {
         BotState.isCalibrating.value = true
         context.fireSignal(RobotSignal.CalibrationStarted)
         delay(1000)
-        val motors = context.runChildAndWait(StartMotors())
+        val motors = context.runAndWait(StartMotors())
         delay(3000)
         return if (motors is ActionResult.Success) {
             context.fireSignal(RobotSignal.CalibrationSucceeded)
@@ -57,7 +57,7 @@ class DeliverPackage : Action("DeliverPackage") {
 class DeliverPackages : Action("DeliverPackages") {
     override suspend fun onExecute(context: ActionContext): ActionResult {
         repeat(5) {
-            val result = context.runChildAndWait(DeliverPackage())
+            val result = context.runAndWait(DeliverPackage())
             delay(1000)
             BotState.temperature.value += (-2..5).random()
             BotState.batteryLevel.value -= (2..4).random()

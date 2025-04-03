@@ -30,7 +30,7 @@ object Reactions {
         condition = { true },
         onFired = { ctx ->
             BotState.currentLocation.value = "dock"
-            ctx.scheduleChild(Announce("Overheat warning. Returning to dock."))
+            ctx.schedule(Announce("Overheat warning. Returning to dock."))
         }
     )
 
@@ -39,7 +39,7 @@ object Reactions {
         signalNames = listOf(RobotSignal.BatteryLow),
         dependsOn = emptyList(),
         condition = { true },
-        onFired = { ctx -> ctx.scheduleChild(ChargeBattery()) }
+        onFired = { ctx -> ctx.schedule(ChargeBattery()) }
     )
 
     val ResumeDelivery = Reaction(
@@ -47,6 +47,6 @@ object Reactions {
         signalNames = listOf(RobotSignal.BatteryCharged),
         dependsOn = emptyList(),
         condition = { true },
-        onFired = { ctx -> ctx.scheduleChild(DeliverPackages()) }
+        onFired = { ctx -> ctx.schedule(DeliverPackages()) }
     )
 }
