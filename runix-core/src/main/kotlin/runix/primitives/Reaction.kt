@@ -1,9 +1,9 @@
 package runix.primitives
 
 import runix.tracing.ExecutionStatus
-import runix.tracing.ExecutionTimer
 import runix.tracing.ExecutionTrace
-import runix.tracing.TraceLogEntry
+import runix.tracing.Trace
+import java.time.Instant
 
 abstract class Reaction protected constructor(
     override val name: String,
@@ -16,40 +16,44 @@ abstract class Reaction protected constructor(
         val trace = context.trace
         val scheduler = context.scheduler
         val logger = scheduler.traceLogger
-        val traceManager = scheduler.traceManager
-        val timer = ExecutionTimer.start()
 
         try {
+            Trace.log(
+                trace = trace,
+                type = "Reaction",
+                status = ExecutionStatus.Started,
+                logger = logger,
+                actor = trace.actor,
+                tags = trace.tags,
+                startTime = trace.startTime
+            )
+
             onFired(ReactionContext.from(context))
 
-            logger?.log(
-                TraceLogEntry(
-                    id = trace.id,
-                    parentId = trace.parentId,
-                    type = "Reaction",
-                    name = name,
-                    timestamp = timer.startTime,
-                    durationMs = timer.elapsed().inWholeMilliseconds,
-                    status = ExecutionStatus.Success,
-                    tracePath = trace.path
-                )
+            Trace.log(
+                trace = trace,
+                type = "Reaction",
+                status = ExecutionStatus.Success,
+                logger = logger,
+                actor = trace.actor,
+                tags = trace.tags,
+                startTime = trace.startTime,
+                endTime = Instant.now()
             )
-            traceManager.complete(trace.id, "Success")
+            context.scheduler.traceManager.complete(trace.id, "Success")
         } catch (e: Exception) {
-            logger?.log(
-                TraceLogEntry(
-                    id = trace.id,
-                    parentId = trace.parentId,
-                    type = "Reaction",
-                    name = name,
-                    timestamp = timer.startTime,
-                    durationMs = timer.elapsed().inWholeMilliseconds,
-                    status = ExecutionStatus.Failure,
-                    tracePath = trace.path,
-                    context = mapOf("error" to (e.message ?: "unknown"))
-                )
+            Trace.log(
+                trace = trace,
+                type = "Reaction",
+                status = ExecutionStatus.Failure,
+                logger = logger,
+                actor = trace.actor,
+                tags = trace.tags,
+                startTime = trace.startTime,
+                endTime = Instant.now(),
+                exception = e.toString()
             )
-            traceManager.complete(trace.id, "Failure")
+            context.scheduler.traceManager.complete(trace.id, "Failure")
             throw e
         }
     }

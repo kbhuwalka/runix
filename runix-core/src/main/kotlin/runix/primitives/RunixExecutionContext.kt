@@ -11,15 +11,17 @@ import runix.tracing.Trace
 data class RunixExecutionContext(
     val trace: ExecutionTrace,
     val scheduler: RunixScheduler,
-    val awaiter: CompletableDeferred<ActionResult>? = null
+    val awaiter: CompletableDeferred<ActionResult>? = null,
+    val actor: String? = null,
+    val tags: List<String> = emptyList()
 ) {
     suspend fun RunixExecutionContext.runAndWait(action: Action): ActionResult {
-        val childTrace = Trace.child(action.name, trace)
+        val childTrace = Trace.child(action.name, trace, actor = action.actor, tags = action.tags)
         return scheduler.runNowAndWait(action, childTrace)
     }
 
     fun RunixExecutionContext.schedule(action: Action) {
-        val childTrace = Trace.child(action.name, trace)
+        val childTrace = Trace.child(action.name, trace, actor = action.actor, tags = action.tags)
         scheduler.schedule(action, childTrace)
     }
 

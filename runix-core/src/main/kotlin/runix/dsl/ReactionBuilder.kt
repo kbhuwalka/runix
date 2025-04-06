@@ -4,7 +4,7 @@ import runix.primitives.Reaction
 import runix.primitives.ReactionContext
 import runix.primitives.Signal
 
-class ReactionBuilder(private val name: String) {
+class ReactionBuilder internal constructor(private val name: String) {
     private val signals = mutableListOf<Signal>()
     private lateinit var handler: (suspend (ctx: ReactionContext) -> Unit)
 

@@ -2,6 +2,7 @@ package runix.primitives
 
 import kotlinx.coroutines.flow.StateFlow
 import runix.internal.MonitorThrottleRegistry
+import runix.internal.ThrottleResult
 import runix.temporal.ConditionEval
 import kotlin.time.Duration
 
@@ -19,7 +20,9 @@ abstract class Monitor protected constructor(
         context.emit(trigger)
     }
 
-    open fun onSkipped(context: MonitorContext) {}
+    open fun onSkipped(context: MonitorContext) {
+        context.logSkipped(name, "Skipped")
+    }
 
     fun evaluateWithContext(baseCtx: RunixExecutionContext) {
         if (!isEnabled()) return
@@ -36,9 +39,14 @@ abstract class Monitor protected constructor(
         when (result) {
             is ConditionEval.True -> {
                 val throttle = throttleInterval
-                if (throttle != null && !MonitorThrottleRegistry.shouldEmit(name, throttle)) {
-                    context.logSkipped(name, "Throttled due to $throttle")
-                    return
+                if (throttle != null) {
+                    when (val throttleResult = MonitorThrottleRegistry.check(name, throttle)) {
+                        is ThrottleResult.Throttled -> {
+                            context.logSkipped(name, "Throttled for ${throttleResult.timeRemainingMs}ms")
+                            return
+                        }
+                        ThrottleResult.Allow -> {}
+                    }
                 }
                 onTriggered(context)
             }

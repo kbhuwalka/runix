@@ -4,10 +4,11 @@ import kotlinx.coroutines.flow.StateFlow
 import runix.primitives.Monitor
 import runix.primitives.Signal
 import runix.temporal.ConditionEval
+import runix.temporal.TemporalExpression
 import kotlin.time.Duration
 
-class MonitorBuilder(private val name: String) {
-    private var condition: (() -> ConditionEval)? = null
+class MonitorBuilder internal constructor(private val name: String) {
+    private var condition: TemporalExpression? = null
     private val dependencies = mutableListOf<StateFlow<*>>()
     private var trigger: Signal? = null
     private var throttle: Duration? = null
@@ -16,12 +17,12 @@ class MonitorBuilder(private val name: String) {
         dependencies += flows
     }
 
-    fun condition(block: () -> Any) {
+    fun fireIf(block: () -> Any) {
         this.condition = {
             when (val result = block()) {
                 is Boolean -> if (result) ConditionEval.True else ConditionEval.False
                 is ConditionEval -> result
-                else -> error("Invalid condition return type: $result")
+                else -> error("Unsupported fireIf block return type: ${result.javaClass.name}. Use a Boolean or a TemporalExpression.")
             }
         }
     }
@@ -30,7 +31,7 @@ class MonitorBuilder(private val name: String) {
         this.throttle = duration
     }
 
-    fun trigger(signal: Signal) {
+    fun emits(signal: Signal) {
         this.trigger = signal
     }
 

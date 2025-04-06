@@ -4,14 +4,6 @@ import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import java.time.Instant
 
-enum class ExecutionStatus {
-    Success,
-    Skipped,
-    Failure,
-    Timeout,
-    Triggered
-}
-
 @Serializable
 data class TraceLogEntry(
     val id: Long,
@@ -21,13 +13,18 @@ data class TraceLogEntry(
     @Contextual val timestamp: Instant,
     val durationMs: Long,
     val status: ExecutionStatus,
-    val cause: Cause? = null,
+    @Contextual val startTime: Instant? = null,
+    @Contextual val endTime: Instant? = null,
+    val exception: String? = null,
+    val actor: String? = null,
+    val tags: List<String> = emptyList(),
+    val causeTrace: CauseTrace? = null,
     val tracePath: List<String> = emptyList(),
     val context: Map<String, String> = emptyMap()
 ) {
     @Serializable
-    data class Cause(
-        val type: String,
-        val name: String
+    data class CauseTrace(
+        val traceId: Long,
+        val reason: String
     )
 }

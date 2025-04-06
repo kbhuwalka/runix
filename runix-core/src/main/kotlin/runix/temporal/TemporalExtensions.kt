@@ -1,18 +1,18 @@
 package runix.temporal
 
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Duration
 
 // Boolean temporal expressions
 
-fun Flow<Boolean>.persistedFor(duration: Duration, key: String): () -> ConditionEval {
+fun StateFlow<Boolean>.persistedFor(duration: Duration, key: String): () -> ConditionEval {
     val tracker: BooleanTracker = TemporalEngine.trackBoolean(this, key)
     return {
         tracker.evaluatePersistence(duration)
     }
 }
 
-fun Flow<Boolean>.occurredAtLeast(n: Int, inLast: Duration, key: String): () -> ConditionEval {
+fun StateFlow<Boolean>.occurredAtLeast(n: Int, inLast: Duration, key: String): () -> ConditionEval {
     val tracker = TemporalEngine.trackBoolean(this, key)
     return {
         val count = tracker.countInWindow(inLast)
@@ -20,7 +20,7 @@ fun Flow<Boolean>.occurredAtLeast(n: Int, inLast: Duration, key: String): () -> 
     }
 }
 
-fun Flow<Boolean>.lastOccurredWithin(duration: Duration, key: String): () -> ConditionEval {
+fun StateFlow<Boolean>.lastOccurredWithin(duration: Duration, key: String): () -> ConditionEval {
     val tracker = TemporalEngine.trackBoolean(this, key)
     return {
         val sinceLast = tracker.timeSinceLastTrue()
@@ -28,7 +28,7 @@ fun Flow<Boolean>.lastOccurredWithin(duration: Duration, key: String): () -> Con
     }
 }
 
-fun Flow<Boolean>.wasSilentFor(duration: Duration, key: String): () -> ConditionEval {
+fun StateFlow<Boolean>.wasSilentFor(duration: Duration, key: String): () -> ConditionEval {
     val tracker = TemporalEngine.trackBoolean(this, key)
     return {
         val sinceLast = tracker.timeSinceLastTrue()
@@ -36,20 +36,41 @@ fun Flow<Boolean>.wasSilentFor(duration: Duration, key: String): () -> Condition
     }
 }
 
-// Numeric expressions
-
-fun Flow<Double>.averageOver(window: Duration, threshold: Double, key: String): () -> ConditionEval {
-    val tracker: NumericTracker = TemporalEngine.trackNumeric(this, key)
+fun StateFlow<Boolean>.debounced(duration: Duration, key: String): () -> ConditionEval {
+    val tracker = TemporalEngine.trackBoolean(this, key)
     return {
-        val avg = tracker.average(window)
-        if (avg > threshold) ConditionEval.True else ConditionEval.False
+        tracker.evaluateDebounce(duration)
     }
 }
 
-fun Flow<Double>.varianceOver(window: Duration, threshold: Double, key: String): () -> ConditionEval {
-    val tracker: NumericTracker = TemporalEngine.trackNumeric(this, key)
+fun StateFlow<Boolean>.stableFor(duration: Duration, key: String): () -> ConditionEval {
+    val tracker = TemporalEngine.trackBoolean(this, key)
     return {
-        val variance = tracker.variance(window)
-        if (variance > threshold) ConditionEval.True else ConditionEval.False
+        tracker.evaluateStability(duration)
+    }
+}
+
+fun StateFlow<Boolean>.changedWithin(duration: Duration, key: String): () -> ConditionEval {
+    val tracker = TemporalEngine.trackBoolean(this, key)
+    return {
+        if (tracker.timeSinceChange() <= duration) ConditionEval.True else ConditionEval.False
+    }
+}
+
+fun StateFlow<Boolean>.notPersistedBeyond(duration: Duration, key: String): () -> ConditionEval {
+    val tracker = TemporalEngine.trackBoolean(this, key)
+    return {
+        if (tracker.evaluatePersistence(duration) == ConditionEval.True) {
+            ConditionEval.False
+        } else {
+            ConditionEval.True
+        }
+    }
+}
+
+fun StateFlow<Boolean>.cooldown(duration: Duration, key: String): () -> ConditionEval {
+    val tracker = TemporalEngine.trackBoolean(this, key)
+    return {
+        tracker.evaluateCooldown(duration)
     }
 }

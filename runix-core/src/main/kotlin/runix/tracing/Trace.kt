@@ -4,19 +4,35 @@ import runix.core.RunixScheduler
 import java.time.Instant
 
 object Trace {
-    fun child(label: String, parent: ExecutionTrace): ExecutionTrace {
+    fun child(
+        label: String,
+        parent: ExecutionTrace,
+        actor: String? = null,
+        tags: List<String> = emptyList(),
+        causeTraceId: Long? = null
+    ): ExecutionTrace {
         return ExecutionTrace(
             parentId = parent.id,
             path = parent.path + label,
-            scheduler = parent.scheduler
+            scheduler = parent.scheduler,
+            actor = actor,
+            tags = tags,
+            causeTraceId = causeTraceId
         )
     }
 
-    fun root(name: String, scheduler: RunixScheduler): ExecutionTrace {
+    fun root(
+        name: String,
+        scheduler: RunixScheduler,
+        actor: String? = null,
+        tags: List<String> = emptyList()
+    ): ExecutionTrace {
         return ExecutionTrace(
             parentId = null,
             path = listOf(name),
-            scheduler = scheduler
+            scheduler = scheduler,
+            actor = actor,
+            tags = tags
         )
     }
 
@@ -25,7 +41,14 @@ object Trace {
         type: String,
         status: ExecutionStatus,
         logger: TraceLogger?,
-        message: String = type
+        message: String = type,
+        startTime: Instant? = null,
+        endTime: Instant? = null,
+        exception: String? = null,
+        actor: String? = null,
+        tags: List<String> = emptyList(),
+        cause: ExecutionTrace? = null,
+        context: Map<String, String> = emptyMap()
     ) {
         logger?.log(
             TraceLogEntry(
@@ -36,8 +59,16 @@ object Trace {
                 timestamp = Instant.now(),
                 durationMs = 0,
                 status = status,
+                startTime = startTime,
+                endTime = endTime,
+                exception = exception,
+                actor = actor,
+                tags = tags,
+                causeTrace = cause?.let {
+                    TraceLogEntry.CauseTrace(traceId = it.id, reason = message)
+                },
                 tracePath = trace.path,
-                context = mapOf("message" to message)
+                context = context
             )
         )
     }
