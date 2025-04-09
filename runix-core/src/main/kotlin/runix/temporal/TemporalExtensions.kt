@@ -1,18 +1,26 @@
 package runix.temporal
 
 import kotlinx.coroutines.flow.StateFlow
+import runix.internal.MonitorThrottleRegistry
+import runix.internal.ThrottleResult
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 // Boolean temporal expressions
 
-fun StateFlow<Boolean>.persistedFor(duration: Duration, key: String): () -> ConditionEval {
-    val tracker: BooleanTracker = TemporalEngine.trackBoolean(this, key)
-    return {
-        tracker.evaluatePersistence(duration)
-    }
+/**
+ * True if the signal has been true continuously for the full duration.
+ */
+fun StateFlow<Boolean>.persistedFor(duration: Duration, key: String): TemporalExpression {
+    val tracker = TemporalEngine.trackBoolean(this, key)
+    return { tracker.evaluatePersistence(duration) }
 }
 
-fun StateFlow<Boolean>.occurredAtLeast(n: Int, inLast: Duration, key: String): () -> ConditionEval {
+/**
+ * True if the signal has flipped to true at least [n] times in the given time window.
+ */
+fun StateFlow<Boolean>.occurredAtLeast(n: Int, inLast: Duration, key: String): TemporalExpression {
     val tracker = TemporalEngine.trackBoolean(this, key)
     return {
         val count = tracker.countInWindow(inLast)
@@ -20,7 +28,10 @@ fun StateFlow<Boolean>.occurredAtLeast(n: Int, inLast: Duration, key: String): (
     }
 }
 
-fun StateFlow<Boolean>.lastOccurredWithin(duration: Duration, key: String): () -> ConditionEval {
+/**
+ * True if the signal last became true within [duration].
+ */
+fun StateFlow<Boolean>.lastTrueWasWithin(duration: Duration, key: String): TemporalExpression {
     val tracker = TemporalEngine.trackBoolean(this, key)
     return {
         val sinceLast = tracker.timeSinceLastTrue()
@@ -28,7 +39,10 @@ fun StateFlow<Boolean>.lastOccurredWithin(duration: Duration, key: String): () -
     }
 }
 
-fun StateFlow<Boolean>.wasSilentFor(duration: Duration, key: String): () -> ConditionEval {
+/**
+ * True if the signal has NOT been true within the last [duration].
+ */
+fun StateFlow<Boolean>.wasSilentFor(duration: Duration, key: String): TemporalExpression {
     val tracker = TemporalEngine.trackBoolean(this, key)
     return {
         val sinceLast = tracker.timeSinceLastTrue()
@@ -36,41 +50,49 @@ fun StateFlow<Boolean>.wasSilentFor(duration: Duration, key: String): () -> Cond
     }
 }
 
-fun StateFlow<Boolean>.debounced(duration: Duration, key: String): () -> ConditionEval {
+/**
+ * True if the signal has remained unchanged for [duration].
+ */
+fun StateFlow<Boolean>.wasStableFor(duration: Duration, key: String): TemporalExpression {
     val tracker = TemporalEngine.trackBoolean(this, key)
-    return {
-        tracker.evaluateDebounce(duration)
-    }
+    return { tracker.evaluateStability(duration) }
 }
 
-fun StateFlow<Boolean>.stableFor(duration: Duration, key: String): () -> ConditionEval {
+/**
+ * True if the signal has changed within the last [duration].
+ */
+fun StateFlow<Boolean>.changedWithin(duration: Duration, key: String): TemporalExpression {
     val tracker = TemporalEngine.trackBoolean(this, key)
     return {
-        tracker.evaluateStability(duration)
-    }
-}
-
-fun StateFlow<Boolean>.changedWithin(duration: Duration, key: String): () -> ConditionEval {
-    val tracker = TemporalEngine.trackBoolean(this, key)
-    return {
-        if (tracker.timeSinceChange() <= duration) ConditionEval.True else ConditionEval.False
-    }
-}
-
-fun StateFlow<Boolean>.notPersistedBeyond(duration: Duration, key: String): () -> ConditionEval {
-    val tracker = TemporalEngine.trackBoolean(this, key)
-    return {
-        if (tracker.evaluatePersistence(duration) == ConditionEval.True) {
-            ConditionEval.False
-        } else {
+        if (tracker.timeSinceChange() <= duration) {
             ConditionEval.True
+        } else {
+            ConditionEval.False
         }
     }
 }
 
-fun StateFlow<Boolean>.cooldown(duration: Duration, key: String): () -> ConditionEval {
+/**
+ * True if the signal has NOT persisted for the given duration.
+ */
+fun StateFlow<Boolean>.notPersistedFor(duration: Duration, key: String): TemporalExpression {
     val tracker = TemporalEngine.trackBoolean(this, key)
     return {
-        tracker.evaluateCooldown(duration)
+        when (tracker.evaluatePersistence(duration)) {
+            ConditionEval.True -> ConditionEval.False
+            else -> ConditionEval.True
+        }
+    }
+}
+
+/**
+ * Converts a Boolean StateFlow into a traceable, reactive temporal condition.
+ * This expression returns TRUE when the current value is true,
+ * and FALSE otherwise. It registers with TemporalEngine for traceability.
+ */
+fun StateFlow<Boolean>.asCondition(key: String): TemporalExpression {
+    TemporalEngine.trackBoolean(this, key)
+    return {
+        if (this.value) ConditionEval.True else ConditionEval.False
     }
 }

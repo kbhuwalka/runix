@@ -12,7 +12,10 @@ repositories {
     mavenCentral()
 }
 
-sourceSets["main"].kotlin.srcDir("src/main/kotlin")
+sourceSets["main"].kotlin.srcDirs(
+    "src/main/kotlin",
+    "examples"
+)
 
 dependencies {
     implementation(kotlin("stdlib"))

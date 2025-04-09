@@ -1,5 +1,6 @@
 package runix.primitives
 
+import runix.temporal.ConditionEval
 import runix.tracing.ExecutionStatus
 import runix.tracing.ExecutionTrace
 import runix.tracing.Trace
@@ -49,6 +50,25 @@ class MonitorContext private constructor(
             startTime = trace.startTime
         )
         traceManager.complete(trace.id, "Skipped")
+    }
+
+    fun logEvaluated(name: String, result: ConditionEval) {
+        val msg = when (result) {
+            is ConditionEval.True -> "Condition TRUE"
+            is ConditionEval.False -> "Condition FALSE"
+            is ConditionEval.Delayed -> "Condition DELAYED until ${result.nextCheckAt}"
+        }
+        trace.logSuccess("Evaluated $name: $msg")
+        Trace.log(
+            trace,
+            type = "Monitor",
+            status = ExecutionStatus.Evaluated,
+            message = msg,
+            logger = scheduler.traceLogger,
+            actor = trace.actor,
+            tags = trace.tags,
+            startTime = trace.startTime
+        )
     }
 
     companion object {

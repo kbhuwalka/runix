@@ -11,12 +11,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
+import runix.internal.MonitorThrottleRegistry
 import runix.internal.RunixRuntimeScope
 import runix.internal.SignalRegistry
+import runix.internal.ThrottleResult
 import runix.primitives.Action
 import runix.primitives.ActionResult
 import runix.primitives.ConflictPolicy
 import runix.primitives.Monitor
+import runix.primitives.MonitorContext
 import runix.primitives.Reaction
 import runix.primitives.RunixExecutable
 import runix.primitives.RunixExecutionContext
@@ -40,6 +43,9 @@ class RunixScheduler(
     val traceLogger: TraceLogger? = null,
     val traceManager: LiveTraceManager = LiveTraceManager()
 ) {
+
+    val scope: CoroutineScope
+        get() = coroutineScope
 
     private val jobQueue = Channel<RunixJob>(Channel.UNLIMITED)
 
@@ -81,7 +87,7 @@ class RunixScheduler(
         }
     }
 
-    fun schedule(job: RunixJob) {
+    private fun schedule(job: RunixJob) {
         val key = "${job.executable.name}-${job.trace.id}"
         val action = job.executable as? Action
 
@@ -136,29 +142,58 @@ class RunixScheduler(
         val combinedFlow = monitor.dependsOn.merge()
 
         return coroutineScope.launch {
-            combinedFlow.collectLatest {
+            combinedFlow.collect {
                 handleMonitorEvaluation(monitor)
             }
         }
     }
 
     private fun handleMonitorEvaluation(monitor: Monitor) {
-        val trace = Trace.root("Monitor(${monitor.name})", this@RunixScheduler)
-        val ctx = RunixExecutionContext(trace, this@RunixScheduler, null)
+        if (!monitor.isEnabled()) return
 
-        when (val result = monitor.condition()) {
+        val trace = Trace.root("Monitor(${monitor.name})", this)
+        val ctx = RunixExecutionContext(trace, this, null)
+        val context = MonitorContext.from(ctx, monitor.name)
+
+        val result = try {
+            monitor.condition()
+        } catch (e: Exception) {
+            context.logSkipped(monitor.name, "Condition threw error: ${e.message}")
+            return
+        }
+
+        context.logEvaluated(monitor.name, result)
+
+        when (result) {
             is ConditionEval.True -> {
-                pendingRechecks.remove(monitor.name)?.cancel()
-                monitor.evaluateWithContext(ctx)
+                val cooldown = monitor.throttleInterval
+                if (cooldown != null) {
+                    when (val throttle = MonitorThrottleRegistry.peek(monitor.name, cooldown)) {
+                        is ThrottleResult.Throttled -> {
+                            context.logSkipped(monitor.name, "Skipped due to cooldown — ${throttle.timeRemainingMs}ms remaining")
+                            return
+                        }
+                        ThrottleResult.Allow -> {
+                            // Proceed to trigger
+                        }
+                    }
+                }
+
+                monitor.onTriggered(context)
+                // ✅ Record trigger *after* successful fire
+                if (cooldown != null) {
+                    MonitorThrottleRegistry.recordTrigger(monitor.name)
+                }
             }
 
             is ConditionEval.Delayed -> {
                 pendingRechecks.remove(monitor.name)?.cancel()
                 pendingRechecks[monitor.name] = scheduleMonitorRecheck(monitor, result.nextCheckAt)
+                monitor.onSkipped(context)
             }
 
             is ConditionEval.False -> {
-                pendingRechecks.remove(monitor.name)?.cancel()
+                monitor.onSkipped(context)
             }
         }
     }
@@ -168,11 +203,13 @@ class RunixScheduler(
      * Used to handle delayed condition evaluations (e.g., `.persistedFor(...)`).
      */
     private fun scheduleMonitorRecheck(monitor: Monitor, at: TimeSource.Monotonic.ValueTimeMark): Job {
-        val delayDuration = at.elapsedNow()
-        if (!delayDuration.isNegative() && delayDuration < Duration.ZERO) return Job() // no-op
+        val now = TimeSource.Monotonic.markNow()
+        val delayDuration = at - now
 
         return coroutineScope.launch {
-            delay(delayDuration)
+            if (delayDuration.isPositive()) {
+                delay(delayDuration)
+            }
             handleMonitorEvaluation(monitor)
         }
     }

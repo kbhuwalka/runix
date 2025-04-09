@@ -15,50 +15,18 @@ abstract class Monitor protected constructor(
 ) {
     open fun isEnabled(): Boolean = true
 
+    /**
+     * Called when the monitor fires. Scheduler guarantees all throttling, evaluation, and delays are respected.
+     */
     open fun onTriggered(context: MonitorContext) {
         context.logTriggered(name, "Firing signal ${trigger.name}")
         context.emit(trigger)
     }
 
+    /**
+     * Called when the monitor is evaluated but not triggered.
+     */
     open fun onSkipped(context: MonitorContext) {
         context.logSkipped(name, "Skipped")
-    }
-
-    fun evaluateWithContext(baseCtx: RunixExecutionContext) {
-        if (!isEnabled()) return
-
-        val context = MonitorContext.from(baseCtx, name)
-
-        val result = try {
-            condition()
-        } catch (e: Exception) {
-            context.logSkipped(name, "Monitor [$name] threw error: ${e.message}")
-            return
-        }
-
-        when (result) {
-            is ConditionEval.True -> {
-                val throttle = throttleInterval
-                if (throttle != null) {
-                    when (val throttleResult = MonitorThrottleRegistry.check(name, throttle)) {
-                        is ThrottleResult.Throttled -> {
-                            context.logSkipped(name, "Throttled for ${throttleResult.timeRemainingMs}ms")
-                            return
-                        }
-                        ThrottleResult.Allow -> {}
-                    }
-                }
-                onTriggered(context)
-            }
-
-            is ConditionEval.False -> {
-                onSkipped(context)
-            }
-
-            is ConditionEval.Delayed -> {
-                // No-op: scheduler will handle rescheduling
-                onSkipped(context)
-            }
-        }
     }
 }

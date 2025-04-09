@@ -17,14 +17,8 @@ class MonitorBuilder internal constructor(private val name: String) {
         dependencies += flows
     }
 
-    fun fireIf(block: () -> Any) {
-        this.condition = {
-            when (val result = block()) {
-                is Boolean -> if (result) ConditionEval.True else ConditionEval.False
-                is ConditionEval -> result
-                else -> error("Unsupported fireIf block return type: ${result.javaClass.name}. Use a Boolean or a TemporalExpression.")
-            }
-        }
+    fun fireIf(condition: TemporalExpression) {
+        this.condition = condition
     }
 
     fun throttle(duration: Duration) {

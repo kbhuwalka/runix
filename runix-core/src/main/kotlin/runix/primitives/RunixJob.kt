@@ -3,6 +3,7 @@ package runix.primitives
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import runix.core.RunixScheduler
+import runix.core.logger
 import runix.tracing.ExecutionStatus
 import runix.tracing.ExecutionTrace
 import runix.tracing.Trace

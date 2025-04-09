@@ -2,6 +2,8 @@ package runix.internal
 
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 sealed class ThrottleResult {
     object Allow : ThrottleResult()
@@ -9,17 +11,20 @@ sealed class ThrottleResult {
 }
 
 internal object MonitorThrottleRegistry {
-    private val lastTriggerTimes = ConcurrentHashMap<String, Long>()
+    private val clock = TimeSource.Monotonic
+    private val lastTriggerMarks = ConcurrentHashMap<String, TimeMark>()
 
-    fun check(name: String, interval: Duration): ThrottleResult {
-        val now = System.currentTimeMillis()
-        val last = lastTriggerTimes[name]
-        return if (last == null || now - last >= interval.inWholeMilliseconds) {
-            lastTriggerTimes[name] = now
+    fun peek(key: String, interval: Duration): ThrottleResult {
+        val last = lastTriggerMarks[key]
+        return if (last == null || last.elapsedNow() >= interval) {
             ThrottleResult.Allow
         } else {
-            val remaining = interval.inWholeMilliseconds - (now - last)
-            ThrottleResult.Throttled(remaining)
+            val remaining = interval - last.elapsedNow()
+            ThrottleResult.Throttled(remaining.inWholeMilliseconds)
         }
+    }
+
+    fun recordTrigger(key: String) {
+        lastTriggerMarks[key] = clock.markNow()
     }
 }

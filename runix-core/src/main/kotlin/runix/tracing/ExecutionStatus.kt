@@ -43,5 +43,7 @@ enum class ExecutionStatus {
      * Indicates that an event completed without implying success or failure,
      * such as signal emission or passive completion of a non-critical operation.
      */
-    Completed
+    Completed,
+
+    Evaluated
 }

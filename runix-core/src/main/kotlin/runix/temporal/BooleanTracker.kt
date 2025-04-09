@@ -29,6 +29,7 @@ class BooleanTracker(flow: StateFlow<Boolean>) {
     private val valueHistory = mutableListOf<ValueWithMark>()
     private var lastValue: Boolean? = null
     private var maxRequiredDuration: Duration = Duration.ZERO
+    private var stableSince: TimeSource.Monotonic.ValueTimeMark? = null
 
     init {
         CoroutineScope(Dispatchers.Default).launch {
@@ -36,6 +37,7 @@ class BooleanTracker(flow: StateFlow<Boolean>) {
                 val now = clock.markNow()
                 if (lastValue == null || lastValue != value) {
                     valueHistory.add(ValueWithMark(value, now))
+                    stableSince = now
                 }
                 lastValue = value
                 if (value) {
@@ -77,41 +79,16 @@ class BooleanTracker(flow: StateFlow<Boolean>) {
         return lastTrueMark?.elapsedNow() ?: Duration.INFINITE
     }
 
-    fun evaluateDebounce(duration: Duration): ConditionEval {
-        pruneHistory(duration)
-        val recent = valueHistory.lastOrNull() ?: return ConditionEval.False
-        val stableSince = valueHistory.asReversed()
-            .takeWhile { it.value == recent.value }
-            .lastOrNull()?.timestamp ?: recent.timestamp
-        val elapsed = stableSince.elapsedNow()
-        return if (elapsed >= duration) {
-            if (recent.value) ConditionEval.True else ConditionEval.False
-        } else {
-            ConditionEval.Delayed(stableSince.plus(duration - elapsed))
-        }
-    }
-
     fun evaluateStability(duration: Duration): ConditionEval {
         pruneHistory(duration)
-        val lastFlip = valueHistory.zipWithNext()
-            .lastOrNull { it.first.value != it.second.value }
-            ?.second?.timestamp ?: valueHistory.firstOrNull()?.timestamp ?: clock.markNow()
-        val elapsed = lastFlip.elapsedNow()
-        return if (elapsed >= duration) {
-            ConditionEval.True
-        } else {
-            ConditionEval.Delayed(lastFlip.plus(duration - elapsed))
-        }
-    }
 
-    fun evaluateCooldown(duration: Duration): ConditionEval {
-        pruneHistory(duration)
-        val lastTrue = valueHistory.lastOrNull { it.value }?.timestamp ?: return ConditionEval.False
-        val elapsed = lastTrue.elapsedNow()
+        val since = stableSince ?: return ConditionEval.False
+        val elapsed = since.elapsedNow()
+
         return if (elapsed >= duration) {
             ConditionEval.True
         } else {
-            ConditionEval.Delayed(lastTrue.plus(duration - elapsed))
+            ConditionEval.Delayed(since.plus(duration - elapsed))
         }
     }
 
