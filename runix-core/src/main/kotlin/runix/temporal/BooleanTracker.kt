@@ -24,14 +24,27 @@ class BooleanTracker(flow: StateFlow<Boolean>) {
 
     private val timestamps = mutableListOf<TimeSource.Monotonic.ValueTimeMark>()
     private var currentStartMark: TimeSource.Monotonic.ValueTimeMark? = null
-    private var lastTrueMark: TimeSource.Monotonic.ValueTimeMark? = null
+    var lastTrueMark: TimeSource.Monotonic.ValueTimeMark? = null
     private val clock = TimeSource.Monotonic
     private val valueHistory = mutableListOf<ValueWithMark>()
-    private var lastValue: Boolean? = null
+    private var lastValue: Boolean
     private var maxRequiredDuration: Duration = Duration.ZERO
-    private var stableSince: TimeSource.Monotonic.ValueTimeMark? = null
+    var stableSince: TimeSource.Monotonic.ValueTimeMark
 
     init {
+        val now = clock.markNow()
+        val initial = flow.value
+
+        lastValue = initial
+        stableSince = now
+        valueHistory.add(ValueWithMark(initial, now))
+
+        if (initial) {
+            lastTrueMark = now
+            currentStartMark = now
+            timestamps.add(now)
+        }
+
         CoroutineScope(Dispatchers.Default).launch {
             flow.collect { value ->
                 val now = clock.markNow()
@@ -76,7 +89,11 @@ class BooleanTracker(flow: StateFlow<Boolean>) {
     }
 
     fun timeSinceLastTrue(): Duration {
-        return lastTrueMark?.elapsedNow() ?: Duration.INFINITE
+        return when {
+            lastTrueMark != null -> lastTrueMark!!.elapsedNow()
+            lastValue == true -> Duration.ZERO
+            else -> Duration.INFINITE
+        }
     }
 
     fun evaluateStability(duration: Duration): ConditionEval {

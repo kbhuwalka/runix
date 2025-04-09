@@ -21,7 +21,7 @@ class ReactionContext private constructor(
         scheduler.schedule(action, childTrace)
     }
 
-    fun fireSignal(signal: Signal) {
+    fun fire(signal: Signal) {
         scheduler.fireSignal(signal, parentTrace = trace)
     }
 

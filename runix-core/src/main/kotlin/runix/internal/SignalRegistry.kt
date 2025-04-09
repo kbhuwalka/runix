@@ -13,6 +13,8 @@ import runix.tracing.ExecutionTrace
 import runix.tracing.Trace
 import runix.tracing.TraceLogger
 import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 typealias CancellationCallback = (ExecutionTrace) -> Unit
 
@@ -21,10 +23,10 @@ internal class SignalRegistry(
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default),
     private val traceLogger: TraceLogger? = null
 ) {
-    private val signals = mutableMapOf<String, MutableSharedFlow<Unit>>()
-    private val listeners = mutableMapOf<String, MutableList<Reaction>>()
-    private val cancellationListeners = mutableMapOf<String, MutableList<CancellationCallback>>()
-    private val lastSignalTraces = mutableMapOf<String, ExecutionTrace>()
+    private val signals = ConcurrentHashMap<String, MutableSharedFlow<Unit>>()
+    private val listeners = ConcurrentHashMap<String, CopyOnWriteArrayList<Reaction>>()
+    private val cancellationListeners = ConcurrentHashMap<String, CopyOnWriteArrayList<CancellationCallback>>()
+    private val lastSignalTraces = ConcurrentHashMap<String, ExecutionTrace>()
 
     fun fire(signal: Signal, parentTrace: ExecutionTrace? = null) {
         val name = signal.name
@@ -33,7 +35,7 @@ internal class SignalRegistry(
 
         // Create trace for signal emission
         val trace = if (parentTrace != null) {
-            Trace.child("Signal($name)", parentTrace, actor = signal.actor, tags = signal.tags)
+            Trace.child("Executing", parentTrace, actor = signal.actor, tags = signal.tags)
         } else {
             Trace.root("Signal($name)", scheduler, actor = signal.actor, tags = signal.tags)
         }
@@ -75,7 +77,7 @@ internal class SignalRegistry(
 
     fun subscribe(signal: Signal, reaction: Reaction) {
         logger.info { "🔗 Subscribed reaction '${reaction.name}' to signal '${signal.name}'" }
-        listeners.getOrPut(signal.name) { mutableListOf() }.add(reaction)
+        listeners.getOrPut(signal.name) { CopyOnWriteArrayList() }.add(reaction)
     }
 
     fun unsubscribe(signal: Signal, reaction: Reaction) {
@@ -87,7 +89,7 @@ internal class SignalRegistry(
     }
 
     fun registerCancellationListener(signal: Signal, callback: CancellationCallback) {
-        cancellationListeners.getOrPut(signal.name) { mutableListOf() }.add(callback)
+        cancellationListeners.getOrPut(signal.name) { CopyOnWriteArrayList() }.add(callback)
     }
 
     fun unregisterCancellationListener(signal: Signal, callback: CancellationCallback) {

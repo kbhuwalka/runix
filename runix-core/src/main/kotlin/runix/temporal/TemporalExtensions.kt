@@ -44,9 +44,22 @@ fun StateFlow<Boolean>.lastTrueWasWithin(duration: Duration, key: String): Tempo
  */
 fun StateFlow<Boolean>.wasSilentFor(duration: Duration, key: String): TemporalExpression {
     val tracker = TemporalEngine.trackBoolean(this, key)
+
     return {
-        val sinceLast = tracker.timeSinceLastTrue()
-        if (sinceLast > duration) ConditionEval.True else ConditionEval.False
+        // Signal is currently true → not silent
+        // Guard clause: signal has never been true, no meaningful silence
+        if (this.value || tracker.lastTrueMark == null) {
+            ConditionEval.False
+        } else {
+            val silenceSince = tracker.stableSince
+            val elapsed = silenceSince.elapsedNow()
+            if (elapsed > duration) {
+                ConditionEval.True
+            } else {
+                val delayUntil = silenceSince.plus(duration-elapsed)
+                ConditionEval.Delayed(delayUntil)
+            }
+        }
     }
 }
 

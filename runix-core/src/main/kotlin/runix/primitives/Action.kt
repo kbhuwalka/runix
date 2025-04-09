@@ -35,10 +35,7 @@ abstract class Action(
         } catch (e: CancellationException) {
             ActionResult.Cancelled(CancellationReason.SignalFired)
         } catch (e: Exception) {
-            ActionResult.Failure(object : ActionError {
-                override val code = "exception"
-                override val message = e.message ?: "Unknown error"
-            })
+            ActionResult.Failure(ActionError(code = "exception", message = e.message ?: "Unknown error"))
         }
 
         when (result) {

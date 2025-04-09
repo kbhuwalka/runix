@@ -1,10 +1,6 @@
 package runix.dsl
 
-import runix.primitives.Action
-import runix.primitives.ActionContext
-import runix.primitives.ActionResult
-import runix.primitives.ConflictPolicy
-import runix.primitives.Signal
+import runix.primitives.*
 import runix.tracing.ExecutionTrace
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -16,8 +12,13 @@ class ActionBuilder internal constructor(val name: String) {
     var actor: String? = null
     var tags: List<String> = emptyList()
 
-    lateinit var body: suspend ActionContext.() -> ActionResult
+    lateinit var executeBlock: suspend ActionContext.() -> ActionResult
+
     var onComplete: suspend (ActionResult, ExecutionTrace) -> Unit = { _, _ -> }
+
+    fun onExecute(block: suspend ActionContext.() -> ActionResult) {
+        this.executeBlock = block
+    }
 
     fun build(): Action {
         val builder = this
@@ -25,11 +26,11 @@ class ActionBuilder internal constructor(val name: String) {
             override val timeout = builder.timeout
             override val conflictPolicy = builder.conflictPolicy
             override val cancelOn = builder.cancelOn
-            override val actor = builder.actor ?: this.name
+            override val actor = builder.actor ?: name
             override val tags = builder.tags
 
             override suspend fun onExecute(context: ActionContext): ActionResult {
-                return builder.body(context)
+                return builder.executeBlock(context)
             }
 
             override suspend fun onComplete(result: ActionResult, trace: ExecutionTrace) {
@@ -39,6 +40,6 @@ class ActionBuilder internal constructor(val name: String) {
     }
 }
 
-public fun action(name: String, block: ActionBuilder.() -> Unit): Action {
+fun action(name: String, block: ActionBuilder.() -> Unit): Action {
     return ActionBuilder(name).apply(block).build()
 }

@@ -14,7 +14,7 @@ class MonitorContext private constructor(
 
     fun emit(signal: Signal) {
         val childTrace = Trace.child(
-            label = "MonitorTrigger",
+            label = "Emitting Signal",
             parent = trace,
             actor = trace.actor,
             tags = trace.tags

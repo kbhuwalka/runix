@@ -15,17 +15,22 @@ data class RunixExecutionContext(
     val actor: String? = null,
     val tags: List<String> = emptyList()
 ) {
-    suspend fun RunixExecutionContext.runAndWait(action: Action): ActionResult {
+    suspend fun runAndWait(action: Action): ActionResult {
         val childTrace = Trace.child(action.name, trace, actor = action.actor, tags = action.tags)
         return scheduler.runNowAndWait(action, childTrace)
     }
 
-    fun RunixExecutionContext.schedule(action: Action) {
+    fun schedule(action: Action) {
         val childTrace = Trace.child(action.name, trace, actor = action.actor, tags = action.tags)
         scheduler.schedule(action, childTrace)
     }
 
-    fun RunixExecutionContext.runAll(vararg actions: Action) {
+    fun runAll(vararg actions: Action) {
         actions.forEach { schedule(it) }
+    }
+
+    fun fire(signal: Signal) {
+        val childTrace = Trace.child(signal.name, trace)
+        scheduler.fireSignal(signal, childTrace)
     }
 }
