@@ -12,3 +12,4 @@ plugins {
 rootProject.name = "runix"
 
 include(":runix-core")
+include("examples")

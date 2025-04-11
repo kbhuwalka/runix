@@ -8,8 +8,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import runix.internal.MonitorThrottleRegistry
 import runix.internal.RunixRuntimeScope
@@ -26,6 +24,8 @@ import runix.primitives.RunixExecutionContext
 import runix.primitives.RunixJob
 import runix.primitives.Signal
 import runix.temporal.ConditionEval
+import runix.temporal.TemporalEngine
+import runix.temporal.compile
 import runix.tracing.ExecutionStatus
 import runix.tracing.ExecutionTrace
 import runix.tracing.LiveTraceManager
@@ -33,7 +33,6 @@ import runix.tracing.Trace
 import runix.tracing.TraceLogger
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.time.Duration
 import kotlin.time.TimeSource
 
 typealias CancellationCallback = (ExecutionTrace) -> Unit
@@ -129,22 +128,40 @@ class RunixScheduler(
     }
 
     fun register(monitor: Monitor): Disposable {
-        val stateJob = startStateListener(monitor)
+        // Step 1: Extract flows
+        val flows = monitor.conditionTree.flows().toList()
 
+        // Step 2: Assign keys per flow
+        val keyMap = flows.withIndex().associate { (i, flow) ->
+            val key = "${monitor.name}::$i"
+            // Step 3: Register tracker and attach scheduler re-eval
+            TemporalEngine.trackBoolean(flow, key) {
+                requestImmediateEvaluation(monitor)
+            }
+            flow to key
+        }
+
+        // Step 4: Compile expression tree
+        val compiled = monitor.conditionTree.compile(keyMap)
+
+        // Step 5: Attach to monitor
+        monitor.condition = compiled
+        monitor.dependencies = flows.toSet()
+
+        // Optional: Log monitor registration
+        logger.info("📡 Registered monitor '${monitor.name}' with ${flows.size} dependencies")
+
+        // Dispose hook (for delayed rechecks only)
         return object : Disposable {
             override fun dispose() {
-                stateJob.cancel()
+                pendingRechecks.remove(monitor.name)?.cancel()
             }
         }
     }
 
-    private fun startStateListener(monitor: Monitor): Job {
-        val combinedFlow = monitor.dependsOn.merge()
-
-        return coroutineScope.launch {
-            combinedFlow.collect {
-                handleMonitorEvaluation(monitor)
-            }
+    private fun requestImmediateEvaluation(monitor: Monitor) {
+        scope.launch {
+            handleMonitorEvaluation(monitor)
         }
     }
 

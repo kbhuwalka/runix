@@ -7,17 +7,20 @@ object TemporalEngine {
     private val boolTrackers = ConcurrentHashMap<String, BooleanTracker>()
     private val numericTrackers = ConcurrentHashMap<String, NumericTracker>()
 
-    // Preferred: named boolean flow
-    fun trackBoolean(flow: StateFlow<Boolean>, key: String): BooleanTracker {
+    fun trackBoolean(flow: StateFlow<Boolean>, key: String, onUpdate: () -> Unit): BooleanTracker {
         return boolTrackers.computeIfAbsent(key) {
-            BooleanTracker(flow)
+            BooleanTracker(flow, key, onUpdate)
         }
     }
 
-    // Fallback: warn about non-named flow
     fun trackNumeric(flow: StateFlow<Double>, key: String): NumericTracker {
         return numericTrackers.computeIfAbsent(key) {
             NumericTracker(flow)
         }
+    }
+
+    fun getBooleanTracker(key: String): BooleanTracker {
+        return boolTrackers[key]
+            ?: error("BooleanTracker not registered for key: $key")
     }
 }
