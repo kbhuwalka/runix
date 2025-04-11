@@ -57,7 +57,7 @@ internal class SignalRegistry(
 
         // Fire reactions
         subscribedReactions.forEach { reaction ->
-            scheduler.schedule(reaction, trace)
+            scheduler.run(reaction, trace)
         }
 
         // Fire cancellation listeners

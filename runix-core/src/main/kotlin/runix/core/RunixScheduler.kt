@@ -298,21 +298,6 @@ class RunixScheduler(
         }
     }
 
-    private fun logCancellationDueToConflict(target: RunixJob, causedBy: RunixJob) {
-        Trace.log(
-            trace = target.trace,
-            type = "Cancelled",
-            status = ExecutionStatus.Cancelled,
-            logger = traceLogger,
-            message = "Cancelled due to conflict with: ${causedBy.trace.path.lastOrNull() ?: "Unknown"}",
-            cause = causedBy.trace
-        )
-    }
-
-    suspend fun runNow(job: RunixJob) {
-        job.run(this)
-    }
-
     fun fireSignal(signal: Signal, parentTrace: ExecutionTrace? = null) {
         val trace = parentTrace?.let {
             Trace.child("Signal(${signal.name})", it, actor = signal.actor, tags = signal.tags)
@@ -326,27 +311,31 @@ class RunixScheduler(
 
     // === Convenience overloads ===
 
-    fun schedule(executable: RunixExecutable, parentTrace: ExecutionTrace? = null) {
+    fun run(executable: RunixExecutable, parentTrace: ExecutionTrace? = null) {
         val trace = childTraceFor(executable.name, parentTrace)
         schedule(RunixJob(executable, trace))
     }
 
-    fun runNow(executable: RunixExecutable, parentTrace: ExecutionTrace? = null) {
-        val trace = childTraceFor(executable.name, parentTrace)
-        coroutineScope.launch {
-            runNow(RunixJob(executable, trace))
-        }
-    }
-
-    suspend fun runNowAndWait(action: Action, parentTrace: ExecutionTrace? = null): ActionResult {
+    suspend fun runAndWait(action: Action, parentTrace: ExecutionTrace? = null): ActionResult {
         val waiter = CompletableDeferred<ActionResult>()
         val trace = childTraceFor(action.name, parentTrace)
         val job = RunixJob(action, trace, waiter)
-        runNow(job)
+        job.run(this)
         return waiter.await()
     }
 
     private fun childTraceFor(name: String, parent: ExecutionTrace?): ExecutionTrace {
         return parent?.let { Trace.child(name, it) } ?: Trace.root(name, this)
+    }
+
+    private fun logCancellationDueToConflict(target: RunixJob, causedBy: RunixJob) {
+        Trace.log(
+            trace = target.trace,
+            type = "Cancelled",
+            status = ExecutionStatus.Cancelled,
+            logger = traceLogger,
+            message = "Cancelled due to conflict with: ${causedBy.trace.path.lastOrNull() ?: "Unknown"}",
+            cause = causedBy.trace
+        )
     }
 }

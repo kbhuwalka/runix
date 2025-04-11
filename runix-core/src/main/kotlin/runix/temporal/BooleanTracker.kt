@@ -2,7 +2,6 @@ package runix.temporal
 
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import runix.core.logger
 import runix.internal.RunixRuntimeScope
 import kotlin.time.TimeSource
 
@@ -12,7 +11,6 @@ import kotlin.time.TimeSource
  */
 class BooleanTracker(
     flow: StateFlow<Boolean>,
-    val key: String,
     val onUpdate: () -> Unit
 ) {
     data class ValueWithMark(val value: Boolean, val timestamp: TimeSource.Monotonic.ValueTimeMark)

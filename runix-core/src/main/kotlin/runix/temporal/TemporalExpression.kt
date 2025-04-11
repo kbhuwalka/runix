@@ -2,13 +2,9 @@ package runix.temporal
 
 import kotlin.time.TimeSource
 
-typealias TemporalExpression = () -> ConditionEval
+internal typealias TemporalExpression = () -> ConditionEval
 
-fun (() -> Boolean).asTemporal(): TemporalExpression = {
-    if (this()) ConditionEval.True else ConditionEval.False
-}
-
-operator fun TemporalExpression.not(): TemporalExpression = {
+internal operator fun TemporalExpression.not(): TemporalExpression = {
     when (val result = this()) {
         is ConditionEval.True -> ConditionEval.False
         is ConditionEval.False -> ConditionEval.True
@@ -16,7 +12,7 @@ operator fun TemporalExpression.not(): TemporalExpression = {
     }
 }
 
-infix fun TemporalExpression.and(other: TemporalExpression): TemporalExpression = {
+internal infix fun TemporalExpression.and(other: TemporalExpression): TemporalExpression = {
     val r1 = this()
     val r2 = other()
 
@@ -31,7 +27,7 @@ infix fun TemporalExpression.and(other: TemporalExpression): TemporalExpression 
     }
 }
 
-infix fun TemporalExpression.or(other: TemporalExpression): TemporalExpression = {
+internal infix fun TemporalExpression.or(other: TemporalExpression): TemporalExpression = {
     val r1 = this()
     val r2 = other()
 
@@ -46,7 +42,7 @@ infix fun TemporalExpression.or(other: TemporalExpression): TemporalExpression =
     }
 }
 
-fun allOf(vararg expressions: TemporalExpression): TemporalExpression {
+internal fun allOf(vararg expressions: TemporalExpression): TemporalExpression {
     return {
         var delayed: ConditionEval.Delayed? = null
         for (expr in expressions) {
@@ -60,7 +56,7 @@ fun allOf(vararg expressions: TemporalExpression): TemporalExpression {
     }
 }
 
-fun anyOf(vararg expressions: TemporalExpression): TemporalExpression {
+internal fun anyOf(vararg expressions: TemporalExpression): TemporalExpression {
     return {
         var delayed: ConditionEval.Delayed? = null
         for (expr in expressions) {
@@ -74,7 +70,7 @@ fun anyOf(vararg expressions: TemporalExpression): TemporalExpression {
     }
 }
 
-fun noneOf(vararg expressions: TemporalExpression): TemporalExpression {
+internal fun noneOf(vararg expressions: TemporalExpression): TemporalExpression {
     return {
         var delayed: ConditionEval.Delayed? = null
         for (expr in expressions) {

@@ -37,7 +37,7 @@ fun main() {
                 if (!BrushModule.runningState.value) {
                     logger.info("🔁 Attempting to start brushes...")
 
-                    val result = scheduler.runNowAndWait(BrushModule.Actions.startBrushes)
+                    val result = scheduler.runAndWait(BrushModule.Actions.startBrushes)
 
                     when (result) {
                         is ActionResult.Success -> {

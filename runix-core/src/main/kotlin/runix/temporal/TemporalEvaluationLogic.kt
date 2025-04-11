@@ -3,7 +3,7 @@ package runix.temporal
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 
-fun BooleanTracker.compilePersistedFor(duration: Duration): TemporalExpression {
+internal fun BooleanTracker.compilePersistedFor(duration: Duration): TemporalExpression {
     return {
         val elapsed = currentStartMark?.elapsedNow()
 
@@ -17,7 +17,7 @@ fun BooleanTracker.compilePersistedFor(duration: Duration): TemporalExpression {
     }
 }
 
-fun BooleanTracker.compileWasStableFor(duration: Duration): TemporalExpression {
+internal fun BooleanTracker.compileWasStableFor(duration: Duration): TemporalExpression {
     return {
         val elapsed = stableSince.elapsedNow()
         if (elapsed >= duration) {
@@ -28,7 +28,7 @@ fun BooleanTracker.compileWasStableFor(duration: Duration): TemporalExpression {
     }
 }
 
-fun BooleanTracker.compileWhenTrue(): TemporalExpression {
+internal fun BooleanTracker.compileWhenTrue(): TemporalExpression {
     return {
         if (lastValue) ConditionEval.True else ConditionEval.False
     }

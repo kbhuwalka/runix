@@ -3,13 +3,13 @@ package runix.temporal
 import kotlinx.coroutines.flow.StateFlow
 import java.util.concurrent.ConcurrentHashMap
 
-object TemporalEngine {
+internal object TemporalEngine {
     private val boolTrackers = ConcurrentHashMap<String, BooleanTracker>()
     private val numericTrackers = ConcurrentHashMap<String, NumericTracker>()
 
     fun trackBoolean(flow: StateFlow<Boolean>, key: String, onUpdate: () -> Unit): BooleanTracker {
         return boolTrackers.computeIfAbsent(key) {
-            BooleanTracker(flow, key, onUpdate)
+            BooleanTracker(flow, onUpdate)
         }
     }
 

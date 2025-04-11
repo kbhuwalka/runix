@@ -13,12 +13,12 @@ class ReactionContext private constructor(
 
     suspend fun runAndWait(action: Action): ActionResult {
         val childTrace = Trace.child("Run", trace, actor = action.actor, tags = action.tags)
-        return scheduler.runNowAndWait(action, childTrace)
+        return scheduler.runAndWait(action, childTrace)
     }
 
     fun schedule(action: Action) {
         val childTrace = Trace.child("Schedule", trace, actor = action.actor, tags = action.tags)
-        scheduler.schedule(action, childTrace)
+        scheduler.run(action, childTrace)
     }
 
     fun fire(signal: Signal) {
