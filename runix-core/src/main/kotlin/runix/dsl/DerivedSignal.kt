@@ -24,7 +24,10 @@ fun <T> derivedSignal(
 
     RunixRuntimeScope.scope.launch {
         source.collect { value ->
-            derived.value = transform(value)
+            val result = transform(value)
+            if (derived.value != result) {
+                derived.value = result
+            }
         }
     }
 

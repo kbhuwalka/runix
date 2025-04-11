@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import runix.internal.RunixRuntimeScope
 import kotlin.math.pow
 import kotlin.time.Duration
 import kotlin.time.TimeSource
@@ -22,7 +23,7 @@ class NumericTracker(flow: StateFlow<Double>) {
     private var maxRequiredDuration: Duration = Duration.ZERO
 
     init {
-        CoroutineScope(Dispatchers.Default).launch {
+        RunixRuntimeScope.scope.launch {
             flow.collect { value ->
                 val now = clock.markNow()
                 valueHistory.add(ValueWithMark(value, now))

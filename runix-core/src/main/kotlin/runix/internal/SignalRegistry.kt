@@ -20,7 +20,6 @@ typealias CancellationCallback = (ExecutionTrace) -> Unit
 
 internal class SignalRegistry(
     private val scheduler: RunixScheduler,
-    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default),
     private val traceLogger: TraceLogger? = null
 ) {
     private val signals = ConcurrentHashMap<String, MutableSharedFlow<Unit>>()
@@ -54,7 +53,7 @@ internal class SignalRegistry(
 
         lastSignalTraces[name] = trace
 
-        scope.launch {
+        RunixRuntimeScope.scope.launch {
             signals[name]?.emit(Unit)
         }
 

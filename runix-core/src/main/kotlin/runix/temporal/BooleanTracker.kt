@@ -4,32 +4,30 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import robot_cleaner.logger
+import runix.internal.RunixRuntimeScope
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 
 /**
  * Tracks changes to a StateFlow<Boolean> signal and evaluates time-aware conditions over time.
  *
- * This tracker assumes hot signal input and stores only changes (true/false flips) over time.
- * History is automatically pruned based on the longest active evaluation window requested,
- * ensuring memory usage is bounded while preserving correctness.
- *
- * Evaluators include:
- * - debounce: suppress flicker
- * - stability: detect no change
- * - cooldown: suppress re-triggers
+ * Supports persistence, stability, silence, and change tracking.
  */
 class BooleanTracker(flow: StateFlow<Boolean>) {
     data class ValueWithMark(val value: Boolean, val timestamp: TimeSource.Monotonic.ValueTimeMark)
 
-    private val timestamps = mutableListOf<TimeSource.Monotonic.ValueTimeMark>()
-    private var currentStartMark: TimeSource.Monotonic.ValueTimeMark? = null
-    var lastTrueMark: TimeSource.Monotonic.ValueTimeMark? = null
     private val clock = TimeSource.Monotonic
-    private val valueHistory = mutableListOf<ValueWithMark>()
-    private var lastValue: Boolean
+
+    private val timestamps = mutableListOf<TimeSource.Monotonic.ValueTimeMark>() // all true values
+    private val valueHistory = mutableListOf<ValueWithMark>()                    // all value changes
+
+    private var currentStartMark: TimeSource.Monotonic.ValueTimeMark? = null    // for persistedFor
+    var lastTrueMark: TimeSource.Monotonic.ValueTimeMark? = null        // for timeSinceLastTrue
+    var stableSince: TimeSource.Monotonic.ValueTimeMark                 // for wasStableFor
+    private var lastValue: Boolean                                              // current value
+
     private var maxRequiredDuration: Duration = Duration.ZERO
-    var stableSince: TimeSource.Monotonic.ValueTimeMark
 
     init {
         val now = clock.markNow()
@@ -40,25 +38,27 @@ class BooleanTracker(flow: StateFlow<Boolean>) {
         valueHistory.add(ValueWithMark(initial, now))
 
         if (initial) {
-            lastTrueMark = now
             currentStartMark = now
+            lastTrueMark = now
             timestamps.add(now)
         }
 
-        CoroutineScope(Dispatchers.Default).launch {
+        RunixRuntimeScope.scope.launch {
             flow.collect { value ->
+                logger.debug("newValue=$value, lastValue=$lastValue")
                 val now = clock.markNow()
-                if (lastValue == null || lastValue != value) {
-                    valueHistory.add(ValueWithMark(value, now))
+
+                if (value != lastValue) {
                     stableSince = now
+                    valueHistory.add(ValueWithMark(value, now))
                 }
+
                 lastValue = value
+
                 if (value) {
-                    if (currentStartMark == null) {
-                        currentStartMark = clock.markNow()
-                    }
-                    lastTrueMark = clock.markNow()
-                    timestamps.add(clock.markNow())
+                    currentStartMark = now
+                    lastTrueMark = now
+                    timestamps.add(now)
                 } else {
                     currentStartMark = null
                 }
@@ -74,12 +74,25 @@ class BooleanTracker(flow: StateFlow<Boolean>) {
     }
 
     fun evaluatePersistence(duration: Duration): ConditionEval {
+        if (!lastValue) return ConditionEval.False
+
         val persisted = currentStartMark?.elapsedNow() ?: return ConditionEval.False
+        logger.debug("persisted=$persisted")
         return if (persisted >= duration) {
             ConditionEval.True
         } else {
-            val nextCheckAt = clock.markNow().plus(duration - persisted)
-            ConditionEval.Delayed(nextCheckAt)
+            ConditionEval.Delayed(clock.markNow().plus(duration - persisted))
+        }
+    }
+
+    fun evaluateStability(duration: Duration): ConditionEval {
+        pruneHistory(duration)
+
+        val elapsed = stableSince.elapsedNow()
+        return if (elapsed >= duration) {
+            ConditionEval.True
+        } else {
+            ConditionEval.Delayed(stableSince.plus(duration - elapsed))
         }
     }
 
@@ -96,21 +109,7 @@ class BooleanTracker(flow: StateFlow<Boolean>) {
         }
     }
 
-    fun evaluateStability(duration: Duration): ConditionEval {
-        pruneHistory(duration)
-
-        val since = stableSince ?: return ConditionEval.False
-        val elapsed = since.elapsedNow()
-
-        return if (elapsed >= duration) {
-            ConditionEval.True
-        } else {
-            ConditionEval.Delayed(since.plus(duration - elapsed))
-        }
-    }
-
     fun timeSinceChange(): Duration {
-        val lastChange = valueHistory.lastOrNull()?.timestamp ?: return Duration.INFINITE
-        return lastChange.elapsedNow()
+        return valueHistory.lastOrNull()?.timestamp?.elapsedNow() ?: Duration.INFINITE
     }
 }
