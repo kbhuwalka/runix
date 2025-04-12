@@ -2,7 +2,7 @@ package robot_cleaner.state
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import runix.dsl.derivedSignal
+import runix.dsl.derivedStateFlow
 
 object PowerState {
     val batteryLevel = MutableStateFlow(100) // %
@@ -11,8 +11,8 @@ object PowerState {
     val isDocked = MutableStateFlow(false)
 
     // Derived: battery is considered low under 20%
-    val isBatteryLow: StateFlow<Boolean> = derivedSignal(batteryLevel) { it < 20 }
+    val isBatteryLow: StateFlow<Boolean> = derivedStateFlow(batteryLevel) { it < 20 }
 
     // Derived: battery is full when above 95%
-    val isBatteryFull: StateFlow<Boolean> = derivedSignal(batteryLevel) { it >= 95 }
+    val isBatteryFull: StateFlow<Boolean> = derivedStateFlow(batteryLevel) { it >= 95 }
 }

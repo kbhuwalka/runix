@@ -16,7 +16,7 @@ import runix.temporal.TemporalEngine
  * Example:
  *     val isHot = derivedSignal(temperature, "is-hot") { it > 85f }
  */
-fun <T> derivedSignal(
+fun <T> derivedStateFlow(
     source: StateFlow<T>,
     transform: (T) -> Boolean
 ): StateFlow<Boolean> {

@@ -4,7 +4,7 @@ import chase_squish.UI
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import runix.dsl.action
-import runix.dsl.derivedSignal
+import runix.dsl.derivedStateFlow
 import runix.dsl.monitor
 import runix.dsl.reaction
 import runix.primitives.ActionError
@@ -21,8 +21,8 @@ object BrushModule {
     val currentTemperature = MutableStateFlow(0f)
 
     object Conditions {
-        val isTemperatureAbove80 = derivedSignal(currentTemperature) { it > 80 }
-        val isTemperatureAbove100 = derivedSignal(currentTemperature) { it > 100 }
+        val isTemperatureAbove80 = derivedStateFlow(currentTemperature) { it > 80 }
+        val isTemperatureAbove100 = derivedStateFlow(currentTemperature) { it > 100 }
     }
 
     object Signals {

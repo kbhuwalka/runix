@@ -2,7 +2,7 @@ package examples.persisted_temp_warning
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import runix.core.RunixScheduler
-import runix.dsl.derivedSignal
+import runix.dsl.derivedStateFlow
 import runix.dsl.monitor
 import runix.primitives.Signal
 import runix.temporal.persistedFor
@@ -12,7 +12,7 @@ class PersistedTempApp {
     val temperature = MutableStateFlow(75f)
 
     // Derived signal — isHot becomes true when temp > 85
-    private val isHot = derivedSignal(temperature) { it > 85f }
+    private val isHot = derivedStateFlow(temperature) { it > 85f }
 
     val signal = object : Signal("overheatWarning") {}
 

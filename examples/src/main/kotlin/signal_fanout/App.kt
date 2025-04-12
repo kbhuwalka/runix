@@ -3,7 +3,7 @@ package examples.signal_fanout
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import runix.core.RunixScheduler
-import runix.dsl.derivedSignal
+import runix.dsl.derivedStateFlow
 import runix.dsl.monitor
 import runix.dsl.reaction
 import runix.primitives.Reaction
@@ -17,7 +17,7 @@ class SignalFanoutApp {
     val isDocked = MutableStateFlow(false)
 
     // Derived boolean
-    private val isBatteryLow: StateFlow<Boolean> = derivedSignal(batteryLevel) { it < 20 }
+    private val isBatteryLow: StateFlow<Boolean> = derivedStateFlow(batteryLevel) { it < 20 }
 
     // Signals
     private val lowBatterySignal = object : Signal("lowBatteryDetected") {}
