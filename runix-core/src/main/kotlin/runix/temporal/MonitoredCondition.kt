@@ -4,63 +4,90 @@ import kotlinx.coroutines.flow.StateFlow
 
 sealed class MonitoredCondition {
     abstract fun flows(): Set<StateFlow<Boolean>>
+    abstract fun compileInternal(getKey: (StateFlow<Boolean>) -> String): Pair<TemporalExpression, List<FlowRegistration>>
+
+    fun compileForRegistration(monitorName: String): CompiledMonitor {
+        val keyMap = mutableMapOf<StateFlow<Boolean>, String>()
+        var counter = 0
+
+        // Lambda to generate or retrieve keys per flow
+        val getKey: (StateFlow<Boolean>) -> String = { flow ->
+            keyMap.getOrPut(flow) { "${monitorName}::$counter" }.also { counter++ }
+        }
+
+        val (compiledExpression, flowRegistrations) = this.compileInternal(getKey)
+
+        return CompiledMonitor(
+            compiledCondition = compiledExpression,
+            flowRegistrations = flowRegistrations
+        )
+    }
 
     data class Leaf(
         val flow: StateFlow<Boolean>,
         val type: TemporalType
     ) : MonitoredCondition() {
         override fun flows(): Set<StateFlow<Boolean>> = setOf(flow)
+
+        override fun compileInternal(getKey: (StateFlow<Boolean>) -> String): Pair<TemporalExpression, List<FlowRegistration>> {
+            val key = getKey(flow)
+            val retention = type.retentionWindow()
+            val compiledExpression = type.compileEvaluation(key)
+            return Pair(compiledExpression, listOf(FlowRegistration(flow, key, retention)))
+        }
     }
 
-    data class Not(val inner: MonitoredCondition) : MonitoredCondition() {
+    data class Not(
+        val inner: MonitoredCondition
+    ) : MonitoredCondition() {
         override fun flows(): Set<StateFlow<Boolean>> = inner.flows()
-    }
 
-    data class AllOf(val parts: List<MonitoredCondition>) : MonitoredCondition() {
-        override fun flows(): Set<StateFlow<Boolean>> = parts.flatMap { it.flows() }.toSet()
-    }
+        override fun compileInternal(getKey: (StateFlow<Boolean>) -> String): Pair<TemporalExpression, List<FlowRegistration>> {
+            val (compiledInner, innerFlows) = inner.compileInternal(getKey)
 
-    data class AnyOf(val parts: List<MonitoredCondition>) : MonitoredCondition() {
-        override fun flows(): Set<StateFlow<Boolean>> = parts.flatMap { it.flows() }.toSet()
-    }
-}
-
-fun MonitoredCondition.compile(
-    keys: Map<StateFlow<Boolean>, String>
-): TemporalExpression {
-    return when (this) {
-        is MonitoredCondition.Leaf -> {
-            val key = keys[flow]
-                ?: error("Missing key for StateFlow in Leaf")
-
-            val tracker = TemporalEngine.getBooleanTracker(key)
-
-            when (type) {
-                is TemporalType.Instant -> tracker.compileWhenTrue()
-                is TemporalType.Persisted -> tracker.compilePersistedFor(type.duration)
-                is TemporalType.WasStable -> tracker.compileWasStableFor(type.duration)
+            val compiledExpression: TemporalExpression = {
+                compiledInner().invert()
             }
-        }
 
-        is MonitoredCondition.Not -> {
-            val innerExpr = inner.compile(keys)
-            return {
-                when (val result = innerExpr()) {
-                    is ConditionEval.True -> ConditionEval.False
-                    is ConditionEval.False -> ConditionEval.True
-                    is ConditionEval.Delayed -> result
-                }
+            return Pair(compiledExpression, innerFlows)
+        }
+    }
+
+    data class AllOf(
+        val parts: List<MonitoredCondition>
+    ) : MonitoredCondition() {
+        override fun flows(): Set<StateFlow<Boolean>> = parts.flatMap { it.flows() }.toSet()
+
+        override fun compileInternal(getKey: (StateFlow<Boolean>) -> String): Pair<TemporalExpression, List<FlowRegistration>> {
+            val compiledParts = parts.map { it.compileInternal(getKey) }
+            val compiledExpressions = compiledParts.map { it.first }
+            val compiledFlows = compiledParts.flatMap { it.second }
+
+            val compiledExpression: TemporalExpression = {
+                val results = compiledExpressions.map { it() }
+                ConditionEval.mergeAll(results)
             }
-        }
 
-        is MonitoredCondition.AllOf -> {
-            val compiled = parts.map { it.compile(keys) }
-            allOf(*compiled.toTypedArray())
+            return Pair(compiledExpression, compiledFlows)
         }
+    }
 
-        is MonitoredCondition.AnyOf -> {
-            val compiled = parts.map { it.compile(keys) }
-            anyOf(*compiled.toTypedArray())
+    data class AnyOf(
+        val parts: List<MonitoredCondition>
+    ) : MonitoredCondition() {
+        override fun flows(): Set<StateFlow<Boolean>> = parts.flatMap { it.flows() }.toSet()
+
+        override fun compileInternal(getKey: (StateFlow<Boolean>) -> String): Pair<TemporalExpression, List<FlowRegistration>> {
+            val compiledParts = parts.map { it.compileInternal(getKey) }
+            val compiledExpressions = compiledParts.map { it.first }
+            val compiledFlows = compiledParts.flatMap { it.second }
+
+            val compiledExpression: TemporalExpression = {
+                val results = compiledExpressions.map { it() }
+                ConditionEval.mergeAny(results)
+            }
+
+            return Pair(compiledExpression, compiledFlows)
         }
     }
 }

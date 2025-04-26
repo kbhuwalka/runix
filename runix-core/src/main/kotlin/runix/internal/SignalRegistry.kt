@@ -51,7 +51,7 @@ internal class SignalRegistry(
 
         lastSignalTraces[name] = trace
 
-        RunixRuntimeScope.scope.launch {
+        RuntimeScope.scope.launch {
             signals[name]?.emit(Unit)
         }
 
