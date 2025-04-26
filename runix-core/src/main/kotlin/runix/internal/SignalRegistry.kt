@@ -32,7 +32,7 @@ internal class SignalRegistry(
 
         // Create trace for signal emission
         val trace = if (parentTrace != null) {
-            Trace.child("Executing", parentTrace, actor = signal.actor, tags = signal.tags)
+            Trace.child("Fired", parentTrace, actor = signal.actor, tags = signal.tags)
         } else {
             Trace.root("Signal($name)", scheduler, actor = signal.actor, tags = signal.tags)
         }

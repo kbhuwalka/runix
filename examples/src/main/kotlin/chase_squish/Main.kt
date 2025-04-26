@@ -9,11 +9,14 @@ import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import runix.core.RunixScheduler
 import runix.primitives.ActionResult
+import runix.tracing.FileTraceLogger
+import java.io.File
 
 private val logger = LoggerFactory.getLogger("BrushSimulation")
 
 fun main() {
-    val scheduler = RunixScheduler()
+    val jsonLogger = FileTraceLogger(File("logs/"))
+    val scheduler = RunixScheduler(traceLogger = jsonLogger)
 
     // Register BrushModule logic
     BrushModule.allMonitors().forEach { scheduler.register(it) }

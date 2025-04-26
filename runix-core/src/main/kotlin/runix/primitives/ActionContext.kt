@@ -39,14 +39,14 @@ class ActionContext private constructor(
     internal fun logSuccess(name: String, message: String, actor: String? = null, tags: List<String> = emptyList(), startTime: Instant = trace.startTime, endTime: Instant = Instant.now()) {
         trace.logSuccess(message)
         val label = "${trace.path.lastOrNull() ?: "Action"}[$name]"
-        Trace.log(trace, type = label, status = ExecutionStatus.Success, logger = logger, message = message, actor = actor, tags = tags, startTime = startTime, endTime = endTime)
+        Trace.log(trace, type = "Action", status = ExecutionStatus.Success, logger = logger, message = message, actor = actor, tags = tags, startTime = startTime, endTime = endTime)
         traceManager.complete(trace.id, label)
     }
 
     internal fun logFailure(name: String, reason: String, actor: String? = null, tags: List<String> = emptyList(), startTime: Instant = trace.startTime, endTime: Instant = Instant.now(), exception: String? = null) {
         trace.logFailure(reason)
         val label = "${trace.path.lastOrNull() ?: "Action"}[$name]"
-        Trace.log(trace, type = label, status = ExecutionStatus.Failure, logger = logger, message = reason, actor = actor, tags = tags, startTime = startTime, endTime = endTime, exception = exception)
+        Trace.log(trace, type = "Action", status = ExecutionStatus.Failure, logger = logger, message = reason, actor = actor, tags = tags, startTime = startTime, endTime = endTime, exception = exception)
         traceManager.complete(trace.id, label)
     }
 
@@ -62,7 +62,7 @@ class ActionContext private constructor(
         val label = "${trace.path.lastOrNull() ?: "Action"}[$name]"
         Trace.log(
             trace,
-            type = label,
+            type = "Action",
             status = ExecutionStatus.Skipped,
             logger = logger,
             message = reason,
@@ -83,7 +83,7 @@ class ActionContext private constructor(
     internal fun logCancelled(name: String, actor: String? = null, tags: List<String> = emptyList(), startTime: Instant = trace.startTime, endTime: Instant = Instant.now()) {
         trace.logCancellation("Cancelled")
         val label = "${trace.path.lastOrNull() ?: "Action"}[$name]"
-        Trace.log(trace, type = label, status = ExecutionStatus.Cancelled, logger = logger, message = "Cancelled", actor = actor, tags = tags, startTime = startTime, endTime = endTime)
+        Trace.log(trace, type = "Action", status = ExecutionStatus.Cancelled, logger = logger, message = "Cancelled", actor = actor, tags = tags, startTime = startTime, endTime = endTime)
         traceManager.complete(trace.id, label)
     }
 

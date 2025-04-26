@@ -72,16 +72,16 @@ object BrushModule {
         val stopBrushes = action("StopBrushes") {
             onExecute {
                 println("🧹 Stopping brushes")
-                if (runningState.value == false) {
+                if (!runningState.value) {
                     return@onExecute ActionResult.Failure(ActionError("StopBrushesFailed", "The brushes are not running"))
                 }
 
                 try {
                     delay(200) // Stop module
                     runningState.value = false
-                    return@onExecute ActionResult.Success("Brushes started")
+                    return@onExecute ActionResult.Success("Brushes stopped")
                 } catch (error: Error) {
-                    return@onExecute ActionResult.Failure(ActionError("StartBrushesFailed", "The module failed to stop"))
+                    return@onExecute ActionResult.Failure(ActionError("StopBrushesFailed", "The module failed to stop"))
                 }
             }
         }
