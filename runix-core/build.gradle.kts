@@ -23,6 +23,8 @@ dependencies {
 
     testImplementation("org.jetbrains.kotlin:kotlin-test")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.0")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.0")
 }
 
 java {
@@ -32,6 +34,10 @@ java {
 
 kotlin {
     jvmToolchain(20)
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 tasks.withType<Jar> {
