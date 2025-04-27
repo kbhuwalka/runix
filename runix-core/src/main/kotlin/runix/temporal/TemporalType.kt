@@ -9,7 +9,7 @@ sealed class TemporalType {
     object Instant : TemporalType() {
         override fun compileEvaluation(key: String): TemporalExpression = {
             val tracker = TemporalEngine.getBooleanTracker(key)
-            tracker.compileWhenTrue()()
+            tracker.isTrue()
         }
 
         override fun retentionWindow(): Duration = Duration.ZERO
@@ -18,7 +18,7 @@ sealed class TemporalType {
     data class Persisted(val duration: Duration) : TemporalType() {
         override fun compileEvaluation(key: String): TemporalExpression = {
             val tracker = TemporalEngine.getBooleanTracker(key)
-            tracker.compilePersistedFor(duration)()
+            tracker.hasPersistedFor(duration)
         }
 
         override fun retentionWindow(): Duration = duration
@@ -27,7 +27,7 @@ sealed class TemporalType {
     data class WasStable(val duration: Duration) : TemporalType() {
         override fun compileEvaluation(key: String): TemporalExpression = {
             val tracker = TemporalEngine.getBooleanTracker(key)
-            tracker.compileWasStableFor(duration)()
+            tracker.hasBeenStableFor(duration)
         }
 
         override fun retentionWindow(): Duration = duration
