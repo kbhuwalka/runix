@@ -4,8 +4,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import runix.internal.RuntimeScope
+import runix.temporal.time.Time
+import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
-import kotlin.time.TimeSource
 
 /**
  * Tracks boolean signal transitions over time with temporal retention.
@@ -16,13 +17,11 @@ internal class BooleanTracker(
     private val retentionDuration: Duration,
     private val onUpdate: () -> Unit
 ) {
-    private val clock = TimeSource.Monotonic
-
     /**
      * Represents a value change event with its timestamp.
      * Consecutive duplicates are not recorded.
      */
-    internal data class ValueWithMark(val value: Boolean, val timestamp: TimeSource.Monotonic.ValueTimeMark)
+    internal data class ValueWithMark(val value: Boolean, val timestamp: ComparableTimeMark)
 
     /**
      * Encapsulates the history of value transitions with append and pruning logic.
@@ -35,7 +34,7 @@ internal class BooleanTracker(
         /**
          * Append a new value event if it differs from the last recorded value.
          */
-        fun append(value: Boolean, timestamp: TimeSource.Monotonic.ValueTimeMark) {
+        fun append(value: Boolean, timestamp: ComparableTimeMark) {
             if (retention == Duration.ZERO) {
                 events.clear()
                 events.add(ValueWithMark(value, timestamp))
@@ -52,7 +51,7 @@ internal class BooleanTracker(
          * Prune events to retain only those overlapping with the retention window.
          * Open-ended last period is always preserved.
          */
-        fun prune(now: TimeSource.Monotonic.ValueTimeMark) {
+        fun prune(now: ComparableTimeMark) {
             if (retention == Duration.ZERO) return
 
             val windowStart = now - retention
@@ -80,12 +79,12 @@ internal class BooleanTracker(
     private val job: Job
 
     init {
-        val now = clock.markNow()
+        val now = Time.markNow()
         valueHistory.append(flow.value, now)
 
         job = RuntimeScope.scope.launch {
             flow.collect { value ->
-                val now = clock.markNow()
+                val now = Time.markNow()
                 valueHistory.append(value, now)
                 onUpdate()
             }
@@ -100,7 +99,7 @@ internal class BooleanTracker(
         if (valueHistory.last().value) ConditionEval.True else ConditionEval.False
 
     fun hasPersistedFor(duration: Duration): ConditionEval {
-        val now = clock.markNow()
+        val now = Time.markNow()
         val lastEvent = valueHistory.last()
 
         if (!lastEvent.value) return ConditionEval.False
@@ -124,14 +123,14 @@ internal class BooleanTracker(
     }
 
     fun hasPersistedForAtLeast(target: Duration): ConditionEval {
-        val now = clock.markNow()
+        val now = Time.markNow()
         val windowStart = now - retentionDuration
 
         valueHistory.prune(now) // Always prune first!
         val history = valueHistory.entries()
 
         var totalTrueDuration = Duration.ZERO
-        var currentTrueStart: TimeSource.Monotonic.ValueTimeMark? = null
+        var currentTrueStart: ComparableTimeMark? = null
 
         for (entry in history) {
             if (entry.value) {
@@ -160,7 +159,7 @@ internal class BooleanTracker(
     }
 
     fun wasEverTrue(): ConditionEval {
-        val now = clock.markNow()
+        val now = Time.markNow()
 
         valueHistory.prune(now)
         val history = valueHistory.entries()
@@ -184,7 +183,7 @@ internal class BooleanTracker(
      * This allows an O(1) evaluation without scanning history.
      */
     fun hasFluctuated(): ConditionEval {
-        val now = clock.markNow()
+        val now = Time.markNow()
 
         valueHistory.prune(now)
 

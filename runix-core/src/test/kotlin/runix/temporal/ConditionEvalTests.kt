@@ -1,11 +1,9 @@
 package runix.temporal
 
+import runix.temporal.time.Time
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
-import kotlin.time.TimeSource
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.nanoseconds
 
 /**
  * Unit tests for ConditionEval.
@@ -29,7 +27,7 @@ class ConditionEvalTests {
 
     @Test
     fun `invert Delayed returns same instance`() {
-        val mark = TimeSource.Monotonic.markNow()
+        val mark = Time.markNow()
         val delayed = ConditionEval.Delayed(mark)
         assertSame(delayed, delayed.invert())
     }
@@ -61,7 +59,7 @@ class ConditionEvalTests {
 
     @Test
     fun `mergeAll single Delayed returns that Delayed`() {
-        val mark = TimeSource.Monotonic.markNow()
+        val mark = Time.markNow()
         val delayed = ConditionEval.Delayed(mark)
         val result = ConditionEval.mergeAll(listOf(delayed))
         assertEquals(delayed, result)
@@ -69,10 +67,10 @@ class ConditionEvalTests {
 
     @Test
     fun `mergeAll multiple Delayed returns earliest mark`() {
-        val m1 = TimeSource.Monotonic.markNow()
+        val m1 = Time.markNow()
         // ensure a different timestamp
         Thread.sleep(1)
-        val m2 = TimeSource.Monotonic.markNow()
+        val m2 = Time.markNow()
 
         val d1 = ConditionEval.Delayed(m1)
         val d2 = ConditionEval.Delayed(m2)
@@ -109,7 +107,7 @@ class ConditionEvalTests {
 
     @Test
     fun `mergeAny single Delayed returns that Delayed`() {
-        val mark = TimeSource.Monotonic.markNow()
+        val mark = Time.markNow()
         val delayed = ConditionEval.Delayed(mark)
         val result = ConditionEval.mergeAny(listOf(delayed))
         assertEquals(delayed, result)
@@ -117,9 +115,9 @@ class ConditionEvalTests {
 
     @Test
     fun `mergeAny multiple Delayed returns earliest mark`() {
-        val m1 = TimeSource.Monotonic.markNow()
+        val m1 = Time.markNow()
         Thread.sleep(1)
-        val m2 = TimeSource.Monotonic.markNow()
+        val m2 = Time.markNow()
 
         val d1 = ConditionEval.Delayed(m1)
         val d2 = ConditionEval.Delayed(m2)

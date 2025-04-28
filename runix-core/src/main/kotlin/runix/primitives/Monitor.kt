@@ -18,7 +18,7 @@ abstract class Monitor protected constructor(
     open val throttleInterval: Duration? = null
 ) {
     /** Final condition expression assigned by scheduler. */
-    lateinit var condition: TemporalExpression
+    internal lateinit var condition: TemporalExpression
 
     /** Dependencies inferred from conditionTree. Assigned at registration. */
     lateinit var dependencies: Set<StateFlow<*>>

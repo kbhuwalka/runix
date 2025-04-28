@@ -1,9 +1,9 @@
 package runix.internal
 
+import runix.temporal.time.Time
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration
 import kotlin.time.TimeMark
-import kotlin.time.TimeSource
 
 sealed class ThrottleResult {
     object Allow : ThrottleResult()
@@ -11,7 +11,6 @@ sealed class ThrottleResult {
 }
 
 internal object MonitorThrottleRegistry {
-    private val clock = TimeSource.Monotonic
     private val lastTriggerMarks = ConcurrentHashMap<String, TimeMark>()
 
     fun peek(key: String, interval: Duration): ThrottleResult {
@@ -25,6 +24,6 @@ internal object MonitorThrottleRegistry {
     }
 
     fun recordTrigger(key: String) {
-        lastTriggerMarks[key] = clock.markNow()
+        lastTriggerMarks[key] = Time.markNow()
     }
 }

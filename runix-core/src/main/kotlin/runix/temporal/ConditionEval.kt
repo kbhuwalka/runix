@@ -1,6 +1,6 @@
 package runix.temporal
 
-import kotlin.time.TimeSource
+import kotlin.time.ComparableTimeMark
 
 /**
  * The result of evaluating a temporal condition at a single instant.
@@ -28,7 +28,7 @@ internal sealed class ConditionEval {
          * • Else → returns True.
          */
         internal fun mergeAll(results: List<ConditionEval>): ConditionEval {
-            var earliest: TimeSource.Monotonic.ValueTimeMark? = null
+            var earliest: ComparableTimeMark? = null
 
             for (r in results) {
                 when (r) {
@@ -47,7 +47,7 @@ internal sealed class ConditionEval {
          * • Else → returns False.
          */
         internal fun mergeAny(results: List<ConditionEval>): ConditionEval {
-            var earliest: TimeSource.Monotonic.ValueTimeMark? = null
+            var earliest: ComparableTimeMark? = null
 
             for (r in results) {
                 when (r) {
@@ -75,7 +75,7 @@ internal sealed class ConditionEval {
      *
      * @property nextCheckAt timestamp (monotonic) when the engine should retry.
      */
-    data class Delayed(val nextCheckAt: TimeSource.Monotonic.ValueTimeMark) : ConditionEval() {
+    data class Delayed(val nextCheckAt: ComparableTimeMark) : ConditionEval() {
         override fun invert() = this
     }
 }

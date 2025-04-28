@@ -8,10 +8,11 @@ import runix.internal.SignalRegistry
 import runix.internal.ThrottleResult
 import runix.primitives.*
 import runix.temporal.ConditionEval
+import runix.temporal.time.delayUntil
 import runix.tracing.*
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.time.TimeSource
+import kotlin.time.ComparableTimeMark
 
 typealias CancellationCallback = (ExecutionTrace) -> Unit
 
@@ -185,14 +186,11 @@ class RunixScheduler(
      * Schedules a re-evaluation of the given [monitor] at a specific time.
      * Used to handle delayed condition evaluations (e.g., `.persistedFor(...)`).
      */
-    private fun scheduleMonitorRecheck(monitor: Monitor, at: TimeSource.Monotonic.ValueTimeMark): Job {
-        val now = TimeSource.Monotonic.markNow()
-        val delayDuration = at - now
-
+    private fun scheduleMonitorRecheck(
+        monitor: Monitor,
+        at: ComparableTimeMark): Job {
         return coroutineScope.launch {
-            if (delayDuration.isPositive()) {
-                delay(delayDuration)
-            }
+            delayUntil(at)
             handleMonitorEvaluation(monitor)
         }
     }
