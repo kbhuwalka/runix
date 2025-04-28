@@ -2,55 +2,79 @@ package runix.temporal
 
 import kotlin.time.TimeSource
 
-sealed class ConditionEval {
-    abstract fun invert(): ConditionEval
+/**
+ * The result of evaluating a temporal condition at a single instant.
+ *
+ * - [True]: condition is satisfied right now.
+ * - [False]: condition is definitively not satisfied.
+ * - [Delayed]: condition is not yet satisfied; retry at [nextCheckAt].
+ */
+internal sealed class ConditionEval {
 
-    companion object {
-        fun mergeAll(results: List<ConditionEval>): ConditionEval {
-            var earliestDelay: TimeSource.Monotonic.ValueTimeMark? = null
+    /**
+     * Inverts this evaluation:
+     * - True  → False
+     * - False → True
+     * - Delayed → Delayed
+     */
+    internal abstract fun invert(): ConditionEval
 
-            for (result in results) {
-                when (result) {
-                    is True -> { /* keep going */ }
-                    is False -> return False
-                    is Delayed -> {
-                        if (earliestDelay == null || result.nextCheckAt < earliestDelay) {
-                            earliestDelay = result.nextCheckAt
-                        }
-                    }
+    internal companion object {
+
+        /**
+         * AND-semantics merge:
+         * • If *any* result is False → returns False immediately.
+         * • Else if *any* result is Delayed → returns the earliest Delayed.
+         * • Else → returns True.
+         */
+        internal fun mergeAll(results: List<ConditionEval>): ConditionEval {
+            var earliest: TimeSource.Monotonic.ValueTimeMark? = null
+
+            for (r in results) {
+                when (r) {
+                    is False   -> return False
+                    is Delayed -> earliest = earliest?.let { minOf(it, r.nextCheckAt) } ?: r.nextCheckAt
+                    is True    -> Unit
                 }
             }
-
-            return earliestDelay?.let { Delayed(it) } ?: True
+            return earliest?.let { Delayed(it) } ?: True
         }
 
-        fun mergeAny(results: List<ConditionEval>): ConditionEval {
-            var earliestDelay: TimeSource.Monotonic.ValueTimeMark? = null
+        /**
+         * OR-semantics merge:
+         * • If *any* result is True → returns True immediately.
+         * • Else if *any* result is Delayed → returns the earliest Delayed.
+         * • Else → returns False.
+         */
+        internal fun mergeAny(results: List<ConditionEval>): ConditionEval {
+            var earliest: TimeSource.Monotonic.ValueTimeMark? = null
 
-            for (result in results) {
-                when (result) {
-                    is True -> return ConditionEval.True
-                    is False -> { /* keep going */ }
-                    is Delayed -> {
-                        if (earliestDelay == null || result.nextCheckAt < earliestDelay) {
-                            earliestDelay = result.nextCheckAt
-                        }
-                    }
+            for (r in results) {
+                when (r) {
+                    is True    -> return True
+                    is Delayed -> earliest = earliest?.let { minOf(it, r.nextCheckAt) } ?: r.nextCheckAt
+                    is False   -> Unit
                 }
             }
-
-            return earliestDelay?.let { Delayed(it) } ?: False
+            return earliest?.let { Delayed(it) } ?: False
         }
     }
 
+    /** Condition is currently satisfied. */
     object True : ConditionEval() {
         override fun invert() = False
     }
 
+    /** Condition is currently not satisfied. */
     object False : ConditionEval() {
         override fun invert() = True
     }
 
+    /**
+     * Condition not yet satisfied; must re-evaluate at [nextCheckAt].
+     *
+     * @property nextCheckAt timestamp (monotonic) when the engine should retry.
+     */
     data class Delayed(val nextCheckAt: TimeSource.Monotonic.ValueTimeMark) : ConditionEval() {
         override fun invert() = this
     }

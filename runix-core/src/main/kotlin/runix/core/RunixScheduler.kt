@@ -106,7 +106,7 @@ class RunixScheduler(
     }
 
     fun register(monitor: Monitor): Disposable {
-        val compiled = monitor.conditionTree.compileForRegistration(monitor.name)
+        val compiled = monitor.conditionTree.compile(monitor.name)
 
         compiled.startTracking {
             requestImmediateEvaluation(monitor)

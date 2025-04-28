@@ -11,7 +11,7 @@ import kotlin.time.TimeSource
  * Tracks boolean signal transitions over time with temporal retention.
  * Maintains a history of value changes and provides temporal condition evaluations.
  */
-class BooleanTracker(
+internal class BooleanTracker(
     flow: StateFlow<Boolean>,
     private val retentionDuration: Duration,
     private val onUpdate: () -> Unit

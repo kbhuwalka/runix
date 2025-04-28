@@ -42,63 +42,63 @@ class NumericTracker(flow: StateFlow<Double>) {
         return if (relevant.isNotEmpty()) relevant.average() else 0.0
     }
 
-    fun variance(window: Duration): Double {
-        pruneHistory(window)
-        val relevant = valueHistory.filter { it.timestamp.elapsedNow() <= window }.map { it.value }
-        val avg = relevant.average()
-        return if (relevant.isNotEmpty()) {
-            relevant.map { (it - avg).pow(2) }.average()
-        } else {
-            0.0
-        }
-    }
-
-    fun evaluateIncrease(threshold: Double, within: Duration): ConditionEval {
-        pruneHistory(within)
-        val reference = valueHistory.firstOrNull { it.timestamp.elapsedNow() <= within } ?: return ConditionEval.False
-        val current = valueHistory.lastOrNull() ?: return ConditionEval.False
-        return if (current.value - reference.value >= threshold) {
-            ConditionEval.True
-        } else {
-            ConditionEval.False
-        }
-    }
-
-    fun evaluateDecrease(threshold: Double, within: Duration): ConditionEval {
-        pruneHistory(within)
-        val reference = valueHistory.firstOrNull { it.timestamp.elapsedNow() <= within } ?: return ConditionEval.False
-        val current = valueHistory.lastOrNull() ?: return ConditionEval.False
-        return if (reference.value - current.value >= threshold) {
-            ConditionEval.True
-        } else {
-            ConditionEval.False
-        }
-    }
-
-    fun evaluateStabilityAbove(value: Double, duration: Duration): ConditionEval {
-        pruneHistory(duration)
-        val earliest = valueHistory.firstOrNull() ?: return ConditionEval.False
-        if (earliest.timestamp.elapsedNow() < duration) {
-            return ConditionEval.Delayed(earliest.timestamp.plus(duration))
-        }
-        return if (valueHistory.all { it.value > value }) ConditionEval.True else ConditionEval.False
-    }
-
-    fun evaluateStabilityBelow(value: Double, duration: Duration): ConditionEval {
-        pruneHistory(duration)
-        val earliest = valueHistory.firstOrNull() ?: return ConditionEval.False
-        if (earliest.timestamp.elapsedNow() < duration) {
-            return ConditionEval.Delayed(earliest.timestamp.plus(duration))
-        }
-        return if (valueHistory.all { it.value < value }) ConditionEval.True else ConditionEval.False
-    }
-
-    fun evaluateStabilityInRange(min: Double, max: Double, duration: Duration): ConditionEval {
-        pruneHistory(duration)
-        val earliest = valueHistory.firstOrNull() ?: return ConditionEval.False
-        if (earliest.timestamp.elapsedNow() < duration) {
-            return ConditionEval.Delayed(earliest.timestamp.plus(duration))
-        }
-        return if (valueHistory.all { it.value in min..max }) ConditionEval.True else ConditionEval.False
-    }
+//    fun variance(window: Duration): Double {
+//        pruneHistory(window)
+//        val relevant = valueHistory.filter { it.timestamp.elapsedNow() <= window }.map { it.value }
+//        val avg = relevant.average()
+//        return if (relevant.isNotEmpty()) {
+//            relevant.map { (it - avg).pow(2) }.average()
+//        } else {
+//            0.0
+//        }
+//    }
+//
+//    fun evaluateIncrease(threshold: Double, within: Duration): ConditionEval {
+//        pruneHistory(within)
+//        val reference = valueHistory.firstOrNull { it.timestamp.elapsedNow() <= within } ?: return ConditionEval.False
+//        val current = valueHistory.lastOrNull() ?: return ConditionEval.False
+//        return if (current.value - reference.value >= threshold) {
+//            ConditionEval.True
+//        } else {
+//            ConditionEval.False
+//        }
+//    }
+//
+//    fun evaluateDecrease(threshold: Double, within: Duration): ConditionEval {
+//        pruneHistory(within)
+//        val reference = valueHistory.firstOrNull { it.timestamp.elapsedNow() <= within } ?: return ConditionEval.False
+//        val current = valueHistory.lastOrNull() ?: return ConditionEval.False
+//        return if (reference.value - current.value >= threshold) {
+//            ConditionEval.True
+//        } else {
+//            ConditionEval.False
+//        }
+//    }
+//
+//    fun evaluateStabilityAbove(value: Double, duration: Duration): ConditionEval {
+//        pruneHistory(duration)
+//        val earliest = valueHistory.firstOrNull() ?: return ConditionEval.False
+//        if (earliest.timestamp.elapsedNow() < duration) {
+//            return ConditionEval.Delayed(earliest.timestamp.plus(duration))
+//        }
+//        return if (valueHistory.all { it.value > value }) ConditionEval.True else ConditionEval.False
+//    }
+//
+//    fun evaluateStabilityBelow(value: Double, duration: Duration): ConditionEval {
+//        pruneHistory(duration)
+//        val earliest = valueHistory.firstOrNull() ?: return ConditionEval.False
+//        if (earliest.timestamp.elapsedNow() < duration) {
+//            return ConditionEval.Delayed(earliest.timestamp.plus(duration))
+//        }
+//        return if (valueHistory.all { it.value < value }) ConditionEval.True else ConditionEval.False
+//    }
+//
+//    fun evaluateStabilityInRange(min: Double, max: Double, duration: Duration): ConditionEval {
+//        pruneHistory(duration)
+//        val earliest = valueHistory.firstOrNull() ?: return ConditionEval.False
+//        if (earliest.timestamp.elapsedNow() < duration) {
+//            return ConditionEval.Delayed(earliest.timestamp.plus(duration))
+//        }
+//        return if (valueHistory.all { it.value in min..max }) ConditionEval.True else ConditionEval.False
+//    }
 }
