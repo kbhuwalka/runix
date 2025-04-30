@@ -1,8 +1,7 @@
 package runix.primitives
 
-import kotlinx.coroutines.flow.StateFlow
 import runix.temporal.MonitoredCondition
-import runix.temporal.TemporalExpression
+import runix.temporal.condition.TemporalExpression
 import kotlin.time.Duration
 
 /**
@@ -18,10 +17,7 @@ abstract class Monitor protected constructor(
     open val throttleInterval: Duration? = null
 ) {
     /** Final condition expression assigned by scheduler. */
-    lateinit var condition: TemporalExpression
-
-    /** Dependencies inferred from conditionTree. Assigned at registration. */
-    lateinit var dependencies: Set<StateFlow<*>>
+    internal lateinit var condition: TemporalExpression
 
     open fun isEnabled(): Boolean = true
 

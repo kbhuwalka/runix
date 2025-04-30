@@ -1,44 +1,23 @@
 package runix.core
 
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import runix.internal.MonitorThrottleRegistry
-import runix.internal.RunixRuntimeScope
+import runix.internal.RuntimeScope
 import runix.internal.SignalRegistry
 import runix.internal.ThrottleResult
-import runix.primitives.Action
-import runix.primitives.ActionResult
-import runix.primitives.ConflictPolicy
-import runix.primitives.Monitor
-import runix.primitives.MonitorContext
-import runix.primitives.Reaction
-import runix.primitives.RunixExecutable
-import runix.primitives.RunixExecutionContext
-import runix.primitives.RunixJob
-import runix.primitives.Signal
-import runix.temporal.ConditionEval
-import runix.temporal.TemporalEngine
-import runix.temporal.compile
-import runix.tracing.ExecutionStatus
-import runix.tracing.ExecutionTrace
-import runix.tracing.LiveTraceManager
-import runix.tracing.Trace
-import runix.tracing.TraceLogger
+import runix.primitives.*
+import runix.temporal.condition.ConditionEval
+import runix.temporal.time.delayUntil
+import runix.tracing.*
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.time.TimeSource
+import kotlin.time.ComparableTimeMark
 
 typealias CancellationCallback = (ExecutionTrace) -> Unit
 
 class RunixScheduler(
-    private val coroutineScope: CoroutineScope = RunixRuntimeScope.scope,
+    private val coroutineScope: CoroutineScope = RuntimeScope.scope,
     val traceLogger: TraceLogger? = null,
     val traceManager: LiveTraceManager = LiveTraceManager()
 ) {
@@ -128,33 +107,16 @@ class RunixScheduler(
     }
 
     fun register(monitor: Monitor): Disposable {
-        // Step 1: Extract flows
-        val flows = monitor.conditionTree.flows().toList()
+        val compiled = monitor.conditionTree.compile(monitor.name)
 
-        // Step 2: Assign keys per flow
-        val keyMap = flows.withIndex().associate { (i, flow) ->
-            val key = "${monitor.name}::$i"
-            // Step 3: Register tracker and attach scheduler re-eval
-            TemporalEngine.trackBoolean(flow, key) {
-                requestImmediateEvaluation(monitor)
-            }
-            flow to key
+        compiled.start {
+            requestImmediateEvaluation(monitor)
         }
+        monitor.condition = compiled.condition
 
-        // Step 4: Compile expression tree
-        val compiled = monitor.conditionTree.compile(keyMap)
-
-        // Step 5: Attach to monitor
-        monitor.condition = compiled
-        monitor.dependencies = flows.toSet()
-
-        // Optional: Log monitor registration
-        logger.info("📡 Registered monitor '${monitor.name}' with ${flows.size} dependencies")
-
-        // Dispose hook (for delayed rechecks only)
         return object : Disposable {
             override fun dispose() {
-                pendingRechecks.remove(monitor.name)?.cancel()
+                compiled.stop()
             }
         }
     }
@@ -219,14 +181,11 @@ class RunixScheduler(
      * Schedules a re-evaluation of the given [monitor] at a specific time.
      * Used to handle delayed condition evaluations (e.g., `.persistedFor(...)`).
      */
-    private fun scheduleMonitorRecheck(monitor: Monitor, at: TimeSource.Monotonic.ValueTimeMark): Job {
-        val now = TimeSource.Monotonic.markNow()
-        val delayDuration = at - now
-
+    private fun scheduleMonitorRecheck(
+        monitor: Monitor,
+        at: ComparableTimeMark): Job {
         return coroutineScope.launch {
-            if (delayDuration.isPositive()) {
-                delay(delayDuration)
-            }
+            delayUntil(at)
             handleMonitorEvaluation(monitor)
         }
     }

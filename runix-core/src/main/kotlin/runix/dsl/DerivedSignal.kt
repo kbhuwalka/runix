@@ -3,14 +3,14 @@ package runix.dsl
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import runix.internal.RunixRuntimeScope
-import runix.temporal.TemporalEngine
+import runix.internal.RuntimeScope
+import runix.temporal.trackers.TrackerRegistry
 
 /**
  * Creates a derived StateFlow<Boolean> that updates whenever [source] changes,
  * using the provided [transform] function.
  *
- * This flow is tracked with [TemporalEngine] under the given [key], and is compatible
+ * This flow is tracked with [TrackerRegistry] under the given [key], and is compatible
  * with all temporal expressions like .persistedFor(), .wasStableFor(), etc.
  *
  * Example:
@@ -22,7 +22,7 @@ fun <T> derivedStateFlow(
 ): StateFlow<Boolean> {
     val derived = MutableStateFlow(transform(source.value))
 
-    RunixRuntimeScope.scope.launch {
+    RuntimeScope.scope.launch {
         source.collect { value ->
             val result = transform(value)
             if (derived.value != result) {

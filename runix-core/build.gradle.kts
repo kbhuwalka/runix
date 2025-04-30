@@ -16,13 +16,23 @@ sourceSets["main"].kotlin.srcDirs("src/main/kotlin")
 
 dependencies {
     implementation(kotlin("stdlib"))
+
+    //Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+
+    // Logging
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
     implementation("ch.qos.logback:logback-classic:1.4.14")
+
+    //JSON Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
 
+    //Testing
     testImplementation("org.jetbrains.kotlin:kotlin-test")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.0")
+    testImplementation("io.mockk:mockk:1.13.7")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.0")
 }
 
 java {
@@ -32,6 +42,13 @@ java {
 
 kotlin {
     jvmToolchain(20)
+    sourceSets.all {
+        languageSettings.optIn("kotlin.time.ExperimentalTime")
+    }
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 tasks.withType<Jar> {
