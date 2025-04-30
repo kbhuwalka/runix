@@ -1,145 +1,76 @@
 package runix.temporal
 
-import kotlinx.coroutines.flow.StateFlow
-
-/** Given a boolean flow, returns its unique tracker key. */
-internal typealias FlowKeyProvider = (StateFlow<Boolean>) -> String
+import runix.temporal.condition.TemporalExpression
 
 /**
- * The result of compiling a condition:
- *  - the runtime evaluator
- *  - the list of flow-to-tracker registrations
- */
-internal typealias ConditionCompilation = Pair<TemporalExpression, List<FlowRegistration>>
-
-/**
- * A declarative, composable boolean condition over one or more [StateFlow] signals.
+ * A declarative, composable condition built from one or more signals.
  *
- * The framework:
- * 1. Calls [compile] with a naming function to obtain a [TemporalExpression] and
- *    list of [FlowRegistration]s.
- * 2. Registers each flow under the generated key.
- * 3. Evaluates the compiled expression at runtime to produce [ConditionEval] results.
+ * Conditions describe *what should be true* — not *how to observe it*.
+ * They are compiled into executable monitors that track signal changes over time
+ * and evaluate changes when necessary.
+ *
+ * Use `monitor(name)` to compile and start a condition.
+ *
+ * Compose conditions using `allOf(...)`, `anyOf(...)`, and `not(...)`, or bind them to individual signals:
+ *
+ * ```
+ * monitor("cooling-trigger") {
+ *   when(
+ *     allOf(
+ *       motor.isRunning.isTrue(),
+ *       temperature.isAbove(80.0, forTime = 30.seconds)
+ *     )
+ *   )
+ *   emit { fan.turnOn() }
+ * }
+ * ```
+ *
+ * All signal registration, flow observation, and history management are handled by the framework.
+ *
+ * You can compile a condition into an executable monitor by calling [compile].
  */
-sealed class MonitoredCondition {
+abstract class MonitoredCondition {
+
+    internal class KeyAllocator(private val monitorName: String) {
+        private var counter = 0
+        fun nextKey(): String = "$monitorName::${counter++}"
+    }
 
     /**
-     * All [StateFlow]s that this condition watches.
+     * Compiles this condition into a [CompiledMonitor] with a unique monitor name.
      *
-     * Internal to the framework: used when setting up trackers.
-     */
-    internal abstract fun flows(): Set<StateFlow<Boolean>>
-
-    /**
-     * Compiles this condition into a [TemporalExpression] plus the
-     * list of [FlowRegistration]s needed by the engine.
+     * This method:
+     * - Allocates unique internal tracker keys
+     * - Prepares signal tracking metadata
+     * - Returns a ready-to-start monitor instance
      *
-     * @param getKey Function that assigns a unique tracker key per flow.
-     * @return A Pair of (runtime evaluator, flow registrations).
-     */
-    internal abstract fun compile(getKey: FlowKeyProvider): ConditionCompilation
-
-    /**
-     * Framework entry point for turning this condition into a [CompiledMonitor].
+     * This does not begin evaluation — call [CompiledMonitor.start] to activate it.
      *
-     * @param monitorName Logical name under which all involved flows are registered.
-     * @return A [CompiledMonitor] ready for execution by the engine.
+     * @param monitorName A developer-visible name for this monitor (used for tracing and registration).
+     * @return A compiled monitor that can be started, stopped, and evaluated.
      */
     internal fun compile(monitorName: String): CompiledMonitor {
-        val keyMap = mutableMapOf<StateFlow<Boolean>, String>()
-        var counter = 0
-
-        // Assign a stable but unique key per flow:
-        val getKey: FlowKeyProvider = { flow ->
-            keyMap.getOrPut(flow) { "$monitorName::$counter" }
-                .also { counter++ }
-        }
-
-        // Delegate to the internal compile(getKey) to build the expression & regs
-        val (expr, regs) = compile(getKey)
+        val bindings = mutableListOf<FlowBinding<*>>()
+        val keyAllocator = KeyAllocator(monitorName)
+        val expression = build(bindings, keyAllocator)
         return CompiledMonitor(
             name = monitorName,
-            compiledCondition = expr,
-            flowRegistrations = regs
-        )
-    }
-
-    // ------------------------------------------------------------------------
-    // Concrete condition types
-    // ------------------------------------------------------------------------
-
-    /**
-     * A single boolean signal checked against one [ConditionType].
-     */
-    data class Leaf(
-        private val flow: StateFlow<Boolean>,
-        private val type:    ConditionType
-    ) : MonitoredCondition() {
-        override fun flows(): Set<StateFlow<Boolean>> =
-            setOf(flow)
-
-        override fun compile(getKey: FlowKeyProvider): ConditionCompilation {
-            val key = getKey(flow)
-            val expr = type.compileExpression(key)
-            val reg = FlowRegistration(flow, key, type.retentionWindow)
-            return expr to listOf(reg)
-        }
+            condition = expression,
+            bindings = bindings)
     }
 
     /**
-     * Logical AND of multiple sub-conditions.
-     * True only if *all* parts evaluate to True.
+     * Subclasses must implement this to build their condition's expression tree
+     * and collect the associated signal bindings.
+     *
+     * This method is internal to the framework and should not be used directly by developers.
+     *
+     * @param bindings Output list that should be populated with all flow bindings for this condition.
+     * @param keyAllocator Provides a unique key per signal reference used in the condition.
+     * @return A [TemporalExpression] that evaluates the condition at runtime.
      */
-    data class AllOf(private val parts: List<MonitoredCondition>) : MonitoredCondition() {
-        override fun flows(): Set<StateFlow<Boolean>> =
-            parts.flatMap { it.flows() }.toSet()
-
-        override fun compile(getKey: FlowKeyProvider): ConditionCompilation {
-            val compiled = parts.map { it.compile(getKey) }
-            val exprs = compiled.map { it.first }
-            val regs = compiled.flatMap { it.second }
-
-            val combined: TemporalExpression = {
-                val results = exprs.map { it() }
-                ConditionEval.mergeAll(results)
-            }
-            return combined to regs
-        }
-    }
-
-    /**
-     * Logical OR of multiple sub-conditions.
-     * True if *any* part evaluates to True.
-     */
-    data class AnyOf(private val parts: List<MonitoredCondition>) : MonitoredCondition() {
-        override fun flows(): Set<StateFlow<Boolean>> =
-            parts.flatMap { it.flows() }.toSet()
-
-        override fun compile(getKey: FlowKeyProvider): ConditionCompilation {
-            val compiled = parts.map { it.compile(getKey) }
-            val exprs = compiled.map { it.first }
-            val regs = compiled.flatMap { it.second }
-
-            val combined: TemporalExpression = {
-                val results = exprs.map { it() }
-                ConditionEval.mergeAny(results)
-            }
-            return combined to regs
-        }
-    }
-
-    /**
-     * Logical NOT (negation) of a sub-condition.
-     * True if the inner part evaluates to False.
-     */
-    data class Not(private val part: MonitoredCondition) : MonitoredCondition() {
-        override fun flows(): Set<StateFlow<Boolean>> =
-            part.flows()
-
-        override fun compile(getKey: FlowKeyProvider): ConditionCompilation {
-            val (expr, regs) = part.compile(getKey)
-            val negated: TemporalExpression = { expr().invert() }
-            return negated to regs
-        }
-    }
+    internal abstract fun build(
+        bindings: MutableList<FlowBinding<*>>,
+        keyAllocator: KeyAllocator
+    ): TemporalExpression
 }

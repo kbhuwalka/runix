@@ -1,56 +1,45 @@
 package runix.temporal
 
-import kotlinx.coroutines.flow.StateFlow
-import kotlin.time.Duration
+import runix.temporal.condition.TemporalExpression
+import runix.temporal.trackers.TrackerRegistry
 
 /**
- * The result of compiling a [MonitoredCondition]:
- *  - [name]: the name of the compiled monitor.
- *  - [compiledCondition]: the runtime evaluator (TemporalExpression).
- *  - [flowRegistrations]: the list of flows + keys + retention windows to register.
+ * A compiled, executable cognitive monitor built from a [MonitoredCondition].
  *
+ * A `CompiledMonitor`:
+ * - Holds the compiled [TemporalExpression] that represents the condition's logic
+ * - Manages lifecycle (`start`, `stop`) of all involved trackers
+ * - Connects signal changes to condition reevaluation via [onUpdate]
+ *
+ * Monitors are created by calling `.compile("monitorName")` on a [MonitoredCondition].
+ * They are inactive by default and must be started explicitly using [start].
+ *
+ * 🧠 Cognition Contract:
+ * - Evaluates to a [ConditionEval] at any time
+ * - Tracks only within the defined memory/retention scope
+ * - Executes all signal observations reactively
  */
 internal data class CompiledMonitor(
     val name: String,
-    val compiledCondition: TemporalExpression,
-    val flowRegistrations: List<FlowRegistration>
+    val condition: TemporalExpression,
+    private val bindings: List<FlowBinding<*>>
 ) {
+    private var started = false
 
-    /**
-     * Starts tracking all registered boolean flows in the engine.
-     *
-     * @param onSignalUpdate invoked whenever any tracked signal updates
-     */
-    internal fun startTracking(onSignalUpdate: () -> Unit) {
-        for (registration in flowRegistrations) {
-            TemporalEngine.trackBoolean(
-                registration.flow,
-                registration.key,
-                registration.requiredRetention,
-                onSignalUpdate
-            )
+    fun start(onUpdate: () -> Unit) {
+        if (started) return
+        started = true
+
+        for (binding in bindings) {
+            val tracker = binding.createTracker(onUpdate)
+            tracker.registerWith(binding.key)
         }
     }
 
-    /**
-     * Stops tracking all registered flows.
-     */
-    internal fun stopTracking() {
-        flowRegistrations.forEach {
-            TemporalEngine.untrackBoolean(it.key)
-        }
+    fun stop() {
+        if (!started) return
+        started = false
+
+        bindings.forEach { TrackerRegistry.unregister(it.key) }
     }
 }
-
-/**
- * Associates a boolean [flow] with:
- *  - a unique tracker [key], and
- *  - the [requiredRetention] window needed to evaluate its condition.
- *
- * Internal to the Runix framework.
- */
-internal data class FlowRegistration(
-    val flow: StateFlow<Boolean>,
-    val key: String,
-    val requiredRetention: Duration
-)

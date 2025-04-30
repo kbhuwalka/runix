@@ -59,11 +59,11 @@ internal class ValueHistory<T>(
      *
      * @param now reference timestamp for the retention cutoff
      */
-    fun prune(now: ComparableTimeMark) {
+    fun prune(now: ComparableTimeMark, minSize: Int = 1) {
         if (retention == Duration.ZERO) return
 
         val windowStart = now - retention
-        while (events.size > 1 && events[1].timestamp <= windowStart) {
+        while (events.size > minSize && events[1].timestamp <= windowStart) {
             events.removeFirst()
         }
     }
@@ -83,4 +83,8 @@ internal class ValueHistory<T>(
      * Chronologically last (most recent) event.
      */
     fun last(): ValueWithMark<T> = events.last()
+
+    fun clear() {
+        events.clear()
+    }
 }

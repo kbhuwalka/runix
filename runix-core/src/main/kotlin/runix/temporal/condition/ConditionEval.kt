@@ -1,21 +1,26 @@
-package runix.temporal
+package runix.temporal.condition
 
 import kotlin.time.ComparableTimeMark
 
+internal typealias TemporalExpression = () -> ConditionEval
+
 /**
- * The result of evaluating a temporal condition at a single instant.
+ * A runtime evaluation result for a declarative condition.
  *
- * - [True]: condition is satisfied right now.
- * - [False]: condition is definitively not satisfied.
- * - [Delayed]: condition is not yet satisfied; retry at [nextCheckAt].
+ * This result is returned by evaluating a compiled [runix.temporal.MonitoredCondition].
+ *
+ * - [True]: The condition is currently satisfied.
+ * - [False]: The condition is definitively not satisfied.
+ * - [Delayed]: The condition is not yet satisfied, but may become satisfied later.
+ *              Check again after [nextCheckAt].
  */
 internal sealed class ConditionEval {
 
     /**
-     * Inverts this evaluation:
-     * - True  → False
-     * - False → True
-     * - Delayed → Delayed
+     * Returns the logical inverse of this evaluation:
+     * - `True` becomes `False`
+     * - `False` becomes `True`
+     * - `Delayed` remains unchanged (cannot negate future readiness)
      */
     internal abstract fun invert(): ConditionEval
 

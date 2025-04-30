@@ -7,7 +7,7 @@ import runix.internal.RuntimeScope
 import runix.internal.SignalRegistry
 import runix.internal.ThrottleResult
 import runix.primitives.*
-import runix.temporal.ConditionEval
+import runix.temporal.condition.ConditionEval
 import runix.temporal.time.delayUntil
 import runix.tracing.*
 import java.time.Instant
@@ -109,19 +109,14 @@ class RunixScheduler(
     fun register(monitor: Monitor): Disposable {
         val compiled = monitor.conditionTree.compile(monitor.name)
 
-        compiled.startTracking {
+        compiled.start {
             requestImmediateEvaluation(monitor)
         }
-
-        monitor.condition = compiled.compiledCondition
-        monitor.dependencies = compiled.flowRegistrations.map { it.flow }.toSet() // optional, based on future needs
-
-
-        logger.info("📡 Registered monitor '${monitor.name}' with ${compiled.flowRegistrations.size} dependencies")
+        monitor.condition = compiled.condition
 
         return object : Disposable {
             override fun dispose() {
-                compiled.stopTracking()
+                compiled.stop()
             }
         }
     }

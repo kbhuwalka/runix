@@ -1,4 +1,4 @@
-package runix.temporal
+package runix.temporal.condition
 
 import runix.temporal.time.Time
 import kotlin.test.Test

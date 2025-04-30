@@ -1,6 +1,6 @@
 package runix.primitives
 
-import runix.temporal.ConditionEval
+import runix.temporal.condition.ConditionEval
 import runix.tracing.ExecutionStatus
 import runix.tracing.ExecutionTrace
 import runix.tracing.Trace

@@ -6,19 +6,25 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import runix.internal.RuntimeScope
 import runix.temporal.time.Time
-import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
 
 /**
- * Core tracker functionality for any StateFlow<T> signal:
- * - Seeds with an initial value event
- * - Collects subsequent signal values over time
- * - Maintains a deque of timestamped events with a fixed retention window
- * - Provides access to the retained history for temporal queries
+ * Base tracker for temporal event series.
  *
- * @param T type of the signal values
- * @param flow the StateFlow<T> to track
- * @param retention time window for pruning history; zero means “always keep only latest change”
+ * @param T The type of values being tracked
+ * @param flow Source of values to track
+ * @param retention How long to retain historical values
+ * @param scope Coroutine scope for collecting values
+ * @param onUpdate Callback for value updates
+ *
+ * @throws IllegalStateException if the flow is already closed
+ * @throws IllegalArgumentException if retention is negative
+ *
+ * Example:
+ * ```
+ * val tracker = NumericTracker(temperatureFlow, 1.hours)
+ * tracker.evaluateTrend { current, previous -> current > previous }
+ * ```
  */
 internal abstract class BaseTracker<T>(
     flow: StateFlow<T>,
@@ -27,8 +33,11 @@ internal abstract class BaseTracker<T>(
     * Collector scope—defaults to the global RuntimeScope but can be overridden
     * in tests or alternate contexts.
     */
-    private val scope: CoroutineScope = RuntimeScope.scope
+    scope: CoroutineScope = RuntimeScope.scope,
+    private val onUpdate: () -> Unit
 ) {
+
+    abstract fun registerWith(key: String)
 
     /** Time-stamped history buffer, seeded with the current value */
     protected val history: ValueHistory<T> =
@@ -41,7 +50,9 @@ internal abstract class BaseTracker<T>(
         try {
             flow.collect { value ->
                 val mark = Time.markNow()
+                println("Adding: $value, at= $mark")
                 history.append(value, mark)
+                onUpdate()
             }
         } catch (e: Throwable) {
             // If the flow itself throws, rethrow or optionally trace/log here.
@@ -52,7 +63,15 @@ internal abstract class BaseTracker<T>(
     /**
      * Stops tracking this flow - cancels the collector and no further events will be recorded
      */
-    internal fun stop() {
+    internal open fun stop() {
         job.cancel()
+    }
+
+    /**
+     * Permanently drops all recorded events.
+     * After calling this, `hasFluctuated()`, etc. will operate only on new data.
+     */
+    open fun clearHistory() {
+        history.clear()
     }
 }
