@@ -3,8 +3,6 @@ package runix.primitives
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
-import runix.tracing.ExecutionTrace
-import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -20,10 +18,9 @@ abstract class Action(
 
     abstract suspend fun onExecute(context: ActionContext): ActionResult
 
-    open suspend fun onComplete(result: ActionResult, trace: ExecutionTrace) {}
+    open suspend fun onComplete(result: ActionResult) {}
 
     override suspend fun runWithContext(context: RunixExecutionContext) {
-        val trace = context.trace
         val actionContext = ActionContext.from(context)
 
         val result = try {
@@ -38,29 +35,11 @@ abstract class Action(
             ActionResult.Failure(ActionError(code = "exception", message = e.message ?: "Unknown error"))
         }
 
-        when (result) {
-            is ActionResult.Success -> {
-                actionContext.logSuccess(name, result.message ?: "Success", actor = this.actor, tags = this.tags, startTime = trace.startTime, endTime = Instant.now())
-            }
-            is ActionResult.Failure -> {
-                actionContext.logFailure(name, result.error.message, actor = this.actor, tags = this.tags, startTime = trace.startTime, endTime = Instant.now())
-            }
-            is ActionResult.Cancelled -> {
-                actionContext.logCancelled(name, actor = this.actor, tags = this.tags, startTime = trace.startTime, endTime = Instant.now())
-            }
-            is ActionResult.Skipped -> {
-                actionContext.logSkipped(name, "Marked skipped by preconditions or scheduler", actor = this.actor, tags = this.tags, startTime = trace.startTime, endTime = Instant.now())
-            }
-            is ActionResult.TimedOut -> {
-                // No-op
-            }
-        }
-
-        onComplete(result, trace)
+        onComplete(result)
         context.awaiter?.complete(result)
     }
 
-    override suspend fun execute(trace: ExecutionTrace) {
+    override suspend fun execute() {
         error("Use runWithContext(...) instead.")
     }
 }

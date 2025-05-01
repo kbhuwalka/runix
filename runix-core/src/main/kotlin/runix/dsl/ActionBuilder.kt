@@ -5,7 +5,6 @@ import runix.primitives.ActionContext
 import runix.primitives.ActionResult
 import runix.primitives.ConflictPolicy
 import runix.primitives.Signal
-import runix.tracing.ExecutionTrace
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -18,7 +17,7 @@ class ActionBuilder internal constructor(val name: String) {
 
     lateinit var executeBlock: suspend ActionContext.() -> ActionResult
 
-    var onComplete: suspend (ActionResult, ExecutionTrace) -> Unit = { _, _ -> }
+    var onComplete: suspend (ActionResult) -> Unit = { _ -> }
 
     fun onExecute(block: suspend ActionContext.() -> ActionResult) {
         this.executeBlock = block
@@ -37,8 +36,8 @@ class ActionBuilder internal constructor(val name: String) {
                 return builder.executeBlock(context)
             }
 
-            override suspend fun onComplete(result: ActionResult, trace: ExecutionTrace) {
-                builder.onComplete(result, trace)
+            override suspend fun onComplete(result: ActionResult) {
+                builder.onComplete(result)
             }
         }
     }

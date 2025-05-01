@@ -23,12 +23,10 @@ abstract class Monitor protected constructor(
 
     /** Called when the monitor fires. */
     open fun onTriggered(context: MonitorContext) {
-        context.logTriggered(name, "Firing signal ${trigger.name}")
         context.emit(trigger)
     }
 
     /** Called when the monitor is evaluated but not triggered. */
     open fun onSkipped(context: MonitorContext) {
-        context.logSkipped(name, "Skipped")
     }
 }
