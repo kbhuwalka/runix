@@ -22,7 +22,7 @@ interface ModuleScope {
     /**
      * Registers a reaction in this module.
      */
-    operator fun ReactionHandle.unaryPlus()
+    operator fun ReactionHandle<*>.unaryPlus()
 
     /**
      * Registers an action in this module.

@@ -1,22 +1,37 @@
 package runix.primitives.reaction
 
+import runix.primitives.signal.SignalHandle
+import runix.runtime.ModuleScope
+import runix.runtime.internal.SignalBus
+
 /**
- * Represents a declared reaction that listens to a signal and responds with logic.
+ * A declared reaction that listens to a [Signal] and runs a handler in response.
  *
- * Must be registered in a ModuleScope to be active.
+ * Reactions are registered inside [ModuleScope] using `+reaction(...)`.
+ *
+ * Example:
+ * ```
+ * val r = reaction(batteryLowSignal) {
+ *   stopAllActions()
+ * }
+ * ```
  */
-class ReactionHandle internal constructor(
-    private val signalName: String,
-    private val handler: suspend () -> Unit
+class ReactionHandle<T> internal constructor(
+    val name: String,
+    private val signal: SignalHandle<T>,
+    private val handler: suspend (T) -> Unit
 ) {
-    private var isRegistered = false
+    private var registered = false
 
     internal fun register(module: String) {
-        check(!isRegistered) {
-            "Reaction for signal '$signalName' already registered in module '$module'."
+        check(!registered) {
+            "Reaction for signal '${signal.name}' is already registered to a module."
         }
-        isRegistered = true
+        registered = true
 
-        // TODO: Register with SignalBus
+        // Hook into the signal bus for event dispatch
+        SignalBus.register(signal, handler)
     }
+
+    override fun toString(): String = "Reaction(${name})"
 }

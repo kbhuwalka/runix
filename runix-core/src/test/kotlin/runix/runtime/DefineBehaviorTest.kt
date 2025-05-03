@@ -82,7 +82,7 @@ class DefineBehaviorTest {
         
         // Mock primitives
         val monitor = mockk<MonitorHandle>(relaxed = true)
-        val reaction = mockk<ReactionHandle>(relaxed = true)
+        val reaction = mockk<ReactionHandle<*>>(relaxed = true)
         val action = mockk<ActionHandle<*>>(relaxed = true)
         
         // Call defineBehavior and add primitives
@@ -104,7 +104,7 @@ class DefineBehaviorTest {
         
         // Mock primitives
         val monitor = mockk<MonitorHandle>(relaxed = true)
-        val reaction = mockk<ReactionHandle>(relaxed = true)
+        val reaction = mockk<ReactionHandle<*>>(relaxed = true)
         val action = mockk<ActionHandle<*>>(relaxed = true)
         
         // Call defineBehavior with the + operator syntax

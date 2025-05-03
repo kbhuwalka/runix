@@ -49,8 +49,8 @@ class DefaultModuleScopeTest {
     @Test
     fun `plus operator adds ReactionHandle to pending list`() {
         val scope = DefaultModuleScope(testModuleName)
-        val reaction1 = mockk<ReactionHandle>(relaxed = true)
-        val reaction2 = mockk<ReactionHandle>(relaxed = true)
+        val reaction1 = mockk<ReactionHandle<Unit>>(relaxed = true)
+        val reaction2 = mockk<ReactionHandle<Unit>>(relaxed = true)
         
         with(scope) {
             +reaction1
@@ -90,7 +90,7 @@ class DefaultModuleScopeTest {
         
         // Create mocks for each type
         val monitor = mockk<MonitorHandle>(relaxed = true)
-        val reaction = mockk<ReactionHandle>(relaxed = true)
+        val reaction = mockk<ReactionHandle<Unit>>(relaxed = true)
         val action = mockk<ActionHandle<*>>(relaxed = true)
         
         // Add them in mixed order
@@ -125,7 +125,7 @@ class DefaultModuleScopeTest {
 
         // Create multiple primitives of each type
         val monitors = List(3) { mockk<MonitorHandle>(relaxed = true) }
-        val reactions = List(2) { mockk<ReactionHandle>(relaxed = true) }
+        val reactions = List(2) { mockk<ReactionHandle<*>>(relaxed = true) }
         val actions = List(4) { mockk<ActionHandle<*>>(relaxed = true) }
 
         // Add all primitives using with block

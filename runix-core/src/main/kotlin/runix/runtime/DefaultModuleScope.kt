@@ -14,7 +14,7 @@ internal class DefaultModuleScope(
 ) : ModuleScope {
 
     private val pendingMonitors = mutableListOf<MonitorHandle>()
-    private val pendingReactions = mutableListOf<ReactionHandle>()
+    private val pendingReactions = mutableListOf<ReactionHandle<*>>()
     private val pendingActions = mutableListOf<ActionHandle<*>>()
 
     // Track if activation has occurred
@@ -24,7 +24,7 @@ internal class DefaultModuleScope(
         pendingMonitors += this
     }
 
-    override fun ReactionHandle.unaryPlus() {
+    override fun ReactionHandle<*>.unaryPlus() {
         pendingReactions += this
     }
 
