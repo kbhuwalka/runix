@@ -6,7 +6,7 @@ import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import runix.primitives.signal.Signal
+import runix.primitives.signal.SignalHandle
 import runix.runtime.RuntimeScheduler
 import runix.temporal.FlowBinding
 import runix.temporal.MonitoredCondition
@@ -101,7 +101,7 @@ class MonitorHandleTest {
     fun `monitor emits signal when condition evaluates to true`() = testScope.runTest {
         val emitted = AtomicBoolean(false)
         
-        val signal = mockk<Signal<Unit>>(relaxed = true)
+        val signal = mockk<SignalHandle<Unit>>(relaxed = true)
         every { signal.emit(Unit) } answers { emitted.set(true) }
         
         val testCondition = TestCondition { ConditionEval.True }
@@ -117,7 +117,7 @@ class MonitorHandleTest {
 
     @Test
     fun `monitor does not emit signal when condition evaluates to false`() = testScope.runTest {
-        val signal = mockk<Signal<Unit>>(relaxed = true)
+        val signal = mockk<SignalHandle<Unit>>(relaxed = true)
         
         val falseCondition = TestCondition(result = { ConditionEval.False })
         val monitor = MonitorHandle("false-monitor", falseCondition, signal)

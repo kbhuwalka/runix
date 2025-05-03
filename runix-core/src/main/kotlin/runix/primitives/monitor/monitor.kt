@@ -1,6 +1,6 @@
 package runix.primitives.monitor
 
-import runix.primitives.signal.Signal
+import runix.primitives.signal.SignalHandle
 import runix.temporal.MonitoredCondition
 
 /**
@@ -18,7 +18,7 @@ class MonitorHandleBuilder internal constructor(
     private val name: String,
     private val condition: MonitoredCondition
 ) {
-    infix fun emit(signal: Signal<Unit>): MonitorHandle {
+    infix fun emit(signal: SignalHandle<Unit>): MonitorHandle {
         return MonitorHandle(name, condition, signal)
     }
 }

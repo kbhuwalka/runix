@@ -1,6 +1,6 @@
 package runix.primitives.monitor
 
-import runix.primitives.signal.Signal
+import runix.primitives.signal.SignalHandle
 import runix.runtime.RuntimeScheduler
 import runix.temporal.CompiledMonitor
 import runix.temporal.MonitoredCondition
@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class MonitorHandle internal constructor(
     private val name: String,
     private val condition: MonitoredCondition,
-    private val signal: Signal<Unit>?
+    private val signal: SignalHandle<Unit>?
 ) {
     private var isRegistered = AtomicBoolean(false)
     private lateinit var compiled: CompiledMonitor
