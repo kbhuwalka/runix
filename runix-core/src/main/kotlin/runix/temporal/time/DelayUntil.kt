@@ -9,7 +9,7 @@ import kotlin.time.Duration.Companion.ZERO
  * In tests (with a TestCoroutineScheduler) or in real time,
  * this hooks into the same clock as Time.markNow().
  */
-suspend fun delayUntil(mark: ComparableTimeMark) {
+internal suspend fun delayUntil(mark: ComparableTimeMark) {
     val wait = mark.durationSince(Time.markNow())
     if (wait > ZERO) {
         delay(wait)
