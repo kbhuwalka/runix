@@ -2,7 +2,7 @@ package runix.temporal.trackers
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
-import runix.internal.RuntimeScope
+import runix.runtime.internal.RuntimeScope
 import runix.temporal.condition.ConditionEval
 import runix.temporal.time.Time
 import runix.temporal.time.durationSince
@@ -100,7 +100,6 @@ internal open class NumericTracker(
             prev = curr
         }
 
-
         if (!match(prev.value)) {
             return ConditionEval.False
         }
@@ -148,7 +147,6 @@ internal open class NumericTracker(
             }
             last = current
             previousValue = current.value
-
 
             val span = last.timestamp - first.timestamp
             if (span >= retention) {

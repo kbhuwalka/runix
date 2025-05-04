@@ -2,7 +2,7 @@ package runix.temporal.trackers
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
-import runix.internal.RuntimeScope
+import runix.runtime.internal.RuntimeScope
 import runix.temporal.condition.ConditionEval
 import runix.temporal.time.Time
 import runix.temporal.time.durationSince
@@ -26,7 +26,7 @@ internal open class BooleanTracker(
     private val retention: Duration,
     scope: CoroutineScope = RuntimeScope.scope,
     onUpdate: () -> Unit
-): BaseTracker<Boolean>(flow, retention, scope, onUpdate) {
+) : BaseTracker<Boolean>(flow, retention, scope, onUpdate) {
 
     override fun registerWith(key: String) {
         TrackerRegistry.register(key, this)
@@ -89,7 +89,6 @@ internal open class BooleanTracker(
 
             prev = curr
         }
-
 
         if (!match(prev.value)) {
             return ConditionEval.False

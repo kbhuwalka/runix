@@ -1,7 +1,7 @@
 package runix.temporal.dsl
 
 import kotlinx.coroutines.flow.StateFlow
-import runix.dsl.LabeledFlow
+import runix.primitives.LabeledFlow
 import runix.temporal.MonitoredCondition
 import runix.temporal.NumericLeaf
 import runix.temporal.condition.Decreasing
@@ -60,7 +60,6 @@ fun StateFlow<Double>.isAbove(threshold: Double): MonitoredCondition =
 fun LabeledFlow<Double>.isAbove(threshold: Double): MonitoredCondition =
     NumericLeaf(flow, IsAbove(threshold))
 
-
 /**
  * Returns `True` if the current value is strictly less than [threshold].
  *
@@ -114,7 +113,6 @@ fun StateFlow<Double>.hasBeenAboveFor(threshold: Double, forDuration: Duration):
  */
 fun LabeledFlow<Double>.hasBeenAboveFor(threshold: Double, forDuration: Duration): MonitoredCondition =
     NumericLeaf(flow, HasPersistedAbove(threshold, forDuration))
-
 
 /**
  * Returns `True` if the current value has remained strictly below [threshold]
@@ -172,7 +170,6 @@ fun StateFlow<Double>.wasAbove(threshold: Double, forDuration: Duration, inLast:
  */
 fun LabeledFlow<Double>.wasAbove(threshold: Double, forDuration: Duration, inLast: Duration): MonitoredCondition =
     NumericLeaf(flow, WasAboveFor(threshold, forDuration, inLast))
-
 
 /**
  * Returns `True` if the value was below [threshold] for at least [forDuration]
@@ -276,7 +273,6 @@ fun StateFlow<Double>.isIncreasing(forDuration: Duration): MonitoredCondition =
 fun LabeledFlow<Double>.isIncreasing(forDuration: Duration): MonitoredCondition =
     NumericLeaf(flow, Increasing(forDuration))
 
-
 /**
  * Returns `True` if the value has been monotonically decreasing
  * for at least [forDuration].
@@ -300,7 +296,6 @@ fun StateFlow<Double>.isDecreasing(forDuration: Duration): MonitoredCondition =
  */
 fun LabeledFlow<Double>.isDecreasing(forDuration: Duration): MonitoredCondition =
     NumericLeaf(flow, Decreasing(forDuration))
-
 
 /**
  * Returns `True` if the signal has remained stable — i.e., the spread between
@@ -326,7 +321,6 @@ fun StateFlow<Double>.isStableWithin(margin: Double, inLast: Duration): Monitore
  */
 fun LabeledFlow<Double>.isStableWithin(margin: Double, inLast: Duration): MonitoredCondition =
     NumericLeaf(flow, StableWithin(margin, inLast))
-
 
 /**
  * Returns `True` if the value has fluctuated beyond [margin] at any point

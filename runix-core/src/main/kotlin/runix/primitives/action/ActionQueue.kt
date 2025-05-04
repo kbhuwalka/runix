@@ -1,10 +1,15 @@
 package runix.primitives.action
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import runix.internal.RuntimeScope
+import kotlinx.coroutines.withTimeout
+import runix.runtime.internal.RuntimeScope
 import java.nio.channels.ClosedChannelException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -79,7 +84,6 @@ internal class ActionQueue<T>(
         return deferred.await()
     }
 
-
     /**
      * Ensures the worker is launched exactly once.
      */
@@ -129,8 +133,6 @@ internal class ActionQueue<T>(
         }
     }
 
-
-
     private suspend fun processExecution(execution: PendingActionExecution<T>) {
         val executionJob = coroutineContext.job
 
@@ -170,7 +172,6 @@ internal class ActionQueue<T>(
         }
     }
 
-
     /**
      * Cancels the currently running jobs.
      */
@@ -188,7 +189,6 @@ internal class ActionQueue<T>(
 
             job.cancel()
         }
-
     }
 
     /**
@@ -208,7 +208,6 @@ internal class ActionQueue<T>(
         // Cancel the worker job to ensure the loop terminates
         workerJob?.cancel()
         workerJob = null
-
     }
 
     /**

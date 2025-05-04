@@ -4,7 +4,9 @@ package runix.runtime
 
 import kotlinx.coroutines.test.runTest
 import runix.primitives.module.AppModule
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class AppLifecycleTest {
 

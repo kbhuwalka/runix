@@ -1,7 +1,7 @@
 package runix.runtime.internal
 
-import java.util.concurrent.atomic.AtomicBoolean
 import runix.primitives.module.AppModule
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Internal helper to track registration state for Registerables.

@@ -5,8 +5,7 @@ import kotlin.time.Duration.Companion.INFINITE
 
 /**
  * Configuration options for creating actions.
- * 
- * @property timeout The maximum duration an action can run before timing out.
+ * * @property timeout The maximum duration an action can run before timing out.
  *                  Default is 5 seconds.
  * @property allowConcurrent Whether multiple instances of this action can run simultaneously.
  *                          When false, only one instance will execute at a time.
@@ -25,8 +24,7 @@ data class ActionOptions(
 /**
  * Declares a new typed Action in the current module or app context.
  *
- * Use this form when the action requires input data to run. Actions are isolated 
- * units of behavior that can receive inputs and produce results.
+ * Use this form when the action requires input data to run. Actions are isolated * units of behavior that can receive inputs and produce results.
  *
  * Example:
  * ```kotlin
@@ -37,8 +35,7 @@ data class ActionOptions(
  * }
  *
  * // With options
- * val moveRobot = action<Coordinates>("moveRobot", 
- *   options = ActionOptions(
+ * val moveRobot = action<Coordinates>("moveRobot", *   options = ActionOptions(
  *     timeout = 10.seconds,
  *     allowConcurrent = true
  *   )

@@ -42,9 +42,7 @@ sealed class ActionResult {
      * - The coroutine context was cancelled
      * - The action implementation threw a CancellationException
      */
-    object Cancelled: ActionResult() {
-
-    }
+    object Cancelled : ActionResult()
 
     /**
      * Indicates the action failed due to an uncaught exception.

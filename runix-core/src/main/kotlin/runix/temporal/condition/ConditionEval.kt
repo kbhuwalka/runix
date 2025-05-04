@@ -37,9 +37,9 @@ internal sealed class ConditionEval {
 
             for (r in results) {
                 when (r) {
-                    is False   -> return False
+                    is False -> return False
                     is Delayed -> earliest = earliest?.let { minOf(it, r.nextCheckAt) } ?: r.nextCheckAt
-                    is True    -> Unit
+                    is True -> Unit
                 }
             }
             return earliest?.let { Delayed(it) } ?: True
@@ -56,9 +56,9 @@ internal sealed class ConditionEval {
 
             for (r in results) {
                 when (r) {
-                    is True    -> return True
+                    is True -> return True
                     is Delayed -> earliest = earliest?.let { minOf(it, r.nextCheckAt) } ?: r.nextCheckAt
-                    is False   -> Unit
+                    is False -> Unit
                 }
             }
             return earliest?.let { Delayed(it) } ?: False

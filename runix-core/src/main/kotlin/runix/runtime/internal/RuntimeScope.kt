@@ -1,4 +1,4 @@
-package runix.internal
+package runix.runtime.internal
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

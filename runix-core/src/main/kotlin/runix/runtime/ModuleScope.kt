@@ -28,5 +28,4 @@ interface ModuleScope {
      * Registers an action in this module.
      */
     operator fun ActionHandle<*>.unaryPlus()
-
 }

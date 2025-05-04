@@ -1,7 +1,7 @@
 package runix.runtime
 
 import kotlinx.coroutines.cancel
-import runix.internal.RuntimeScope
+import runix.runtime.internal.RuntimeScope
 import runix.primitives.module.AppModule
 
 /**

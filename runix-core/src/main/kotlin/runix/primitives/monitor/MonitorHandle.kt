@@ -10,7 +10,6 @@ import runix.temporal.MonitoredCondition
 import runix.temporal.condition.ConditionEval
 import java.util.concurrent.atomic.AtomicBoolean
 
-
 /**
  * A declared monitor that observes a condition and optionally emits a signal.
  *
@@ -30,7 +29,7 @@ class MonitorHandle internal constructor(
     private val name: String,
     private val condition: MonitoredCondition,
     private val signal: SignalHandle<Unit>?
-): Registerable {
+) : Registerable {
     private val guard = RegistrationGuard()
     private lateinit var compiled: CompiledMonitor
     private var started = AtomicBoolean(false)

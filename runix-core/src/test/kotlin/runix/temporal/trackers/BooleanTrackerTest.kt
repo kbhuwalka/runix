@@ -22,7 +22,7 @@ import kotlin.time.ExperimentalTime
 class BooleanTrackerTest {
 
     private val scheduler = TestCoroutineScheduler()
-    private val provider  = TestSchedulerTimeProvider(scheduler)
+    private val provider = TestSchedulerTimeProvider(scheduler)
 
     @BeforeTest
     fun setup() {

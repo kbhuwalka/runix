@@ -1,7 +1,7 @@
 package runix.runtime
 
-import runix.runtime.internal.BehaviorRegistry
 import runix.primitives.module.AppModule
+import runix.runtime.internal.BehaviorRegistry
 
 /**
  * Declarative entrypoint for defining a module's behavior.

@@ -3,13 +3,21 @@ package runix.temporal.condition
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.*
-import runix.internal.RuntimeScope
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Assertions.assertTrue
+import runix.runtime.internal.RuntimeScope
 import runix.temporal.time.TestSchedulerTimeProvider
 import runix.temporal.time.Time
 import runix.temporal.trackers.NumericTracker
 import runix.temporal.trackers.TrackerProvider
-import kotlin.test.*
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 
@@ -100,7 +108,7 @@ class NumericConditionTypeTest {
         flow.value = 20.0
         advanceTimeBy(2.seconds)
         advanceUntilIdle()
-        
+
         flow.value = 30.0
         advanceTimeBy(3.seconds)
         advanceUntilIdle()

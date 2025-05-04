@@ -1,4 +1,4 @@
-package runix.dsl
+package runix.primitives
 
 import kotlinx.coroutines.flow.StateFlow
 
@@ -16,7 +16,6 @@ data class LabeledFlow<T>(
     val flow: StateFlow<T>,
     val label: String
 )
-
 
 /**
  * Associates a human-readable [name] with this [StateFlow], returning a [LabeledFlow]

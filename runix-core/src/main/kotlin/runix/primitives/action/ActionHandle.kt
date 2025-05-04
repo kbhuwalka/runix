@@ -21,7 +21,7 @@ class ActionHandle<T>(
     private val enqueueIfRunning: Boolean,
     timeout: Duration,
     block: suspend (T) -> ActionResult
-): Registerable {
+) : Registerable {
     private val queue: ActionQueue<T> = ActionQueue(name, timeout, allowConcurrent, enqueueIfRunning, block)
     private val guard = RegistrationGuard()
 
@@ -61,7 +61,7 @@ class ActionHandle<T>(
         queue.cancelRunning()
     }
 
-    fun cancelAll () {
+    fun cancelAll() {
         queue.cancelAll()
     }
 

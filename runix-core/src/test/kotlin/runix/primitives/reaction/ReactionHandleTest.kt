@@ -1,16 +1,22 @@
 package runix.primitives.reaction
 
-import io.mockk.*
+import io.mockk.every
+import io.mockk.justRun
+import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.slot
+import io.mockk.unmockkObject
+import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import reaction
+import runix.primitives.module.AppModule
 import runix.primitives.signal.SignalHandle
 import runix.runtime.internal.SignalBus
 import kotlin.test.assertEquals
-import runix.primitives.module.AppModule
 
 class ReactionHandleTest {
 
@@ -100,7 +106,7 @@ class ReactionHandleTest {
     @Test
     fun `register with different module names still throws on second call`() {
         // Arrange
-        val signal = SignalHandle<Double>("sensorSignal") 
+        val signal = SignalHandle<Double>("sensorSignal")
         val handler: suspend (Double) -> Unit = { /* Do nothing */ }
         val reactionHandle = ReactionHandle("test-reaction", signal, handler)
         val testModule1 = createTestModule("TestModule1")
@@ -177,14 +183,14 @@ class ReactionHandleTest {
         val handler1: suspend (Int) -> Unit = { /* Do nothing */ }
         val handler2: suspend (Int) -> Unit = { /* Do nothing */ }
         val testModule = createTestModule()
-        
+
         val reaction1 = ReactionHandle("test-reaction", signal, handler1)
         val reaction2 = ReactionHandle("test-reaction", signal, handler2)
-        
+
         // Act
         reaction1.register(testModule)
         reaction2.register(testModule)
-        
+
         // Assert
         verify(exactly = 1) { SignalBus.register(signal, handler1) }
         verify(exactly = 1) { SignalBus.register(signal, handler2) }

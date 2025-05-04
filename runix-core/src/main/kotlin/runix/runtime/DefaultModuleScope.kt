@@ -1,9 +1,9 @@
 package runix.runtime
 
-import runix.primitives.monitor.MonitorHandle
-import runix.primitives.reaction.ReactionHandle
 import runix.primitives.action.ActionHandle
 import runix.primitives.module.AppModule
+import runix.primitives.monitor.MonitorHandle
+import runix.primitives.reaction.ReactionHandle
 
 /**
  * Internal runtime implementation of [ModuleScope].
@@ -32,7 +32,6 @@ internal class DefaultModuleScope(
     override fun ActionHandle<*>.unaryPlus() {
         pendingActions += this
     }
-
 
     fun activate() {
         if (isActivated) return

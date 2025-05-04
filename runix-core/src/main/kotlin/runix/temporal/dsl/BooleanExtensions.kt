@@ -1,7 +1,7 @@
 package runix.temporal.dsl
 
 import kotlinx.coroutines.flow.StateFlow
-import runix.dsl.LabeledFlow
+import runix.primitives.LabeledFlow
 import runix.temporal.BooleanLeaf
 import runix.temporal.MonitoredCondition
 import runix.temporal.condition.HasFluctuated
@@ -27,7 +27,6 @@ import kotlin.time.Duration
  * All time-based conditions are retention-aware and bounded in memory.
  */
 
-
 /**
  * Creates a condition that is true when the current Boolean value is `true`.
  *
@@ -49,7 +48,6 @@ fun StateFlow<Boolean>.isTrue(): MonitoredCondition =
  */
 fun LabeledFlow<Boolean>.isTrue(): MonitoredCondition =
     BooleanLeaf(flow, IsTrue())
-
 
 /**
  * Creates a condition that is true only if the Boolean value has remained `true`
@@ -76,7 +74,6 @@ fun StateFlow<Boolean>.hasBeenTrueFor(forDuration: Duration): MonitoredCondition
 fun LabeledFlow<Boolean>.hasBeenTrueFor(forDuration: Duration): MonitoredCondition =
     BooleanLeaf(flow, HasPersistedTrue(forDuration))
 
-
 /**
  * Creates a condition that is true if the Boolean value was `true` for at least [forDuration],
  * at any point within the last [inLast] time window.
@@ -98,7 +95,6 @@ fun StateFlow<Boolean>.wasTrueFor(forDuration: Duration, inLast: Duration): Moni
 fun LabeledFlow<Boolean>.wasTrueFor(forDuration: Duration, inLast: Duration): MonitoredCondition =
     BooleanLeaf(flow, WasTrueFor(forDuration, inLast))
 
-
 /**
  * Creates a condition that is true if the value was `true` at any time
  * within the last [inLast] window, regardless of how long it lasted.
@@ -118,7 +114,6 @@ fun StateFlow<Boolean>.wasEverTrue(inLast: Duration): MonitoredCondition =
  */
 fun LabeledFlow<Boolean>.wasEverTrue(inLast: Duration): MonitoredCondition =
     BooleanLeaf(flow, WasEverTrue(inLast))
-
 
 /**
  * Creates a condition that is true if the Boolean value changed
