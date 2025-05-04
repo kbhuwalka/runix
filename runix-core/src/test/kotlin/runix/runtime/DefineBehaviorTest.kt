@@ -92,10 +92,10 @@ class DefineBehaviorTest {
             +action
         }
         
-        // Verify the primitives were registered with the module name
-        verify { monitor.register("TestModule") }
-        verify { reaction.register("TestModule") }
-        verify { action.register("TestModule") }
+        // Verify the primitives were registered with the module
+        verify { monitor.register(module) }
+        verify { reaction.register(module) }
+        verify { action.register(module) }
     }
     
     @Test
@@ -115,9 +115,9 @@ class DefineBehaviorTest {
         }
         
         // Verify the primitives were registered
-        verify { monitor.register("TestModule") }
-        verify { reaction.register("TestModule") }
-        verify { action.register("TestModule") }
+        verify { monitor.register(module) }
+        verify { reaction.register(module) }
+        verify { action.register(module) }
     }
     
     @Test

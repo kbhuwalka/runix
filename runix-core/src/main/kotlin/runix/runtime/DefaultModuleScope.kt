@@ -3,6 +3,7 @@ package runix.runtime
 import runix.primitives.monitor.MonitorHandle
 import runix.primitives.reaction.ReactionHandle
 import runix.primitives.action.ActionHandle
+import runix.primitives.module.AppModule
 
 /**
  * Internal runtime implementation of [ModuleScope].
@@ -10,7 +11,7 @@ import runix.primitives.action.ActionHandle
  * Accumulates declared primitives and registers them into the runtime scheduler.
  */
 internal class DefaultModuleScope(
-    private val moduleName: String
+    private val module: AppModule
 ) : ModuleScope {
 
     private val pendingMonitors = mutableListOf<MonitorHandle>()
@@ -36,9 +37,9 @@ internal class DefaultModuleScope(
     fun activate() {
         if (isActivated) return
 
-        pendingMonitors.forEach { it.register(moduleName) }
-        pendingReactions.forEach { it.register(moduleName) }
-        pendingActions.forEach { it.register(moduleName) }
+        pendingMonitors.forEach { it.register(module) }
+        pendingReactions.forEach { it.register(module) }
+        pendingActions.forEach { it.register(module) }
         isActivated = true
     }
 }

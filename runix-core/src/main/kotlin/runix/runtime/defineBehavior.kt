@@ -20,7 +20,7 @@ import runix.primitives.module.AppModule
 fun AppModule.defineBehavior(block: ModuleScope.() -> Unit) {
     BehaviorRegistry.claim(this)
 
-    val scope = DefaultModuleScope(moduleName = name)
+    val scope = DefaultModuleScope(module = this)
     scope.block()
     scope.activate()
 }

@@ -1,7 +1,10 @@
 package runix.primitives.monitor
 
+import runix.primitives.module.AppModule
 import runix.primitives.signal.SignalHandle
 import runix.runtime.RuntimeScheduler
+import runix.runtime.internal.Registerable
+import runix.runtime.internal.RegistrationGuard
 import runix.temporal.CompiledMonitor
 import runix.temporal.MonitoredCondition
 import runix.temporal.condition.ConditionEval
@@ -27,8 +30,8 @@ class MonitorHandle internal constructor(
     private val name: String,
     private val condition: MonitoredCondition,
     private val signal: SignalHandle<Unit>?
-) {
-    private var isRegistered = AtomicBoolean(false)
+): Registerable {
+    private val guard = RegistrationGuard()
     private lateinit var compiled: CompiledMonitor
     private var started = AtomicBoolean(false)
 
@@ -39,16 +42,13 @@ class MonitorHandle internal constructor(
      * @param module Name of the module registering this monitor
      * @throws IllegalStateException if already registered
      */
-    internal fun register(module: String) {
-        check(!isRegistered.get()) {
-            "Monitor '$name' is already registered to a module."
-        }
-        isRegistered.set(true)
+    override fun register(module: AppModule) {
+        guard.register(module)
         compiled = condition.compile(name)
     }
 
     internal fun start() {
-        check(isRegistered.get()) { "Monitor '$name' must be registered before starting." }
+        check(guard.isRegistered()) { "Monitor '$name' must be registered before starting." }
         if (started.get()) return
         started.set(true)
 
@@ -89,7 +89,7 @@ class MonitorHandle internal constructor(
     /**
      * Returns whether the monitor has been registered to a module.
      */
-    internal fun isRegistered(): Boolean = isRegistered.get()
+    internal fun isRegistered(): Boolean = guard.isRegistered()
 
     override fun toString(): String = "Monitor($name)"
 }

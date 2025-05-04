@@ -10,8 +10,16 @@ import reaction
 import runix.primitives.signal.SignalHandle
 import runix.runtime.internal.SignalBus
 import kotlin.test.assertEquals
+import runix.primitives.module.AppModule
 
 class ReactionHandleTest {
+
+    // Add a helper method to create test modules
+    private fun createTestModule(name: String = "TestModule"): AppModule {
+        return mockk {
+            every { this@mockk.name } returns name
+        }
+    }
 
     @BeforeEach
     fun setup() {
@@ -30,14 +38,15 @@ class ReactionHandleTest {
         val signalName = "testSignal"
         val signal = SignalHandle<String>(signalName)
         val handler: suspend (String) -> Unit = { /* Do nothing */ }
+        val testModule = createTestModule()
 
         // Act
-        val reactionHandle = reaction("test-reaction",signal, handler)
+        val reactionHandle = reaction("test-reaction", signal, handler)
 
         // Assert
         // Verify by testing registration behavior since we don't have direct property access
         justRun { SignalBus.register(signal, handler) }
-        reactionHandle.register("testModule")
+        reactionHandle.register(testModule)
         verify(exactly = 1) { SignalBus.register(signal, handler) }
     }
 
@@ -62,10 +71,10 @@ class ReactionHandleTest {
         val signal = SignalHandle<Int>("numericSignal")
         val handler: suspend (Int) -> Unit = { /* Do nothing */ }
         val reactionHandle = ReactionHandle("test-reaction", signal, handler)
-        val moduleName = "TestModule"
+        val testModule = createTestModule()
 
         // Act
-        reactionHandle.register("testModule")
+        reactionHandle.register(testModule)
 
         // Assert
         verify(exactly = 1) { SignalBus.register(signal, handler) }
@@ -77,14 +86,14 @@ class ReactionHandleTest {
         val signal = SignalHandle<Boolean>("flagSignal")
         val handler: suspend (Boolean) -> Unit = { /* Do nothing */ }
         val reactionHandle = ReactionHandle("test-reaction", signal, handler)
-        val moduleName = "TestModule"
+        val testModule = createTestModule()
 
         // Register once successfully
-        reactionHandle.register("testModule")
+        reactionHandle.register(testModule)
 
         // Act & Assert
         assertThrows<IllegalStateException> {
-            reactionHandle.register("testModule")
+            reactionHandle.register(testModule)
         }
     }
 
@@ -94,13 +103,15 @@ class ReactionHandleTest {
         val signal = SignalHandle<Double>("sensorSignal") 
         val handler: suspend (Double) -> Unit = { /* Do nothing */ }
         val reactionHandle = ReactionHandle("test-reaction", signal, handler)
+        val testModule1 = createTestModule("TestModule1")
+        val testModule2 = createTestModule("TestModule2")
 
         // Register once successfully
-        reactionHandle.register("testModule1")
+        reactionHandle.register(testModule1)
 
         // Act & Assert
         assertThrows<IllegalStateException> {
-            reactionHandle.register("testModule2")
+            reactionHandle.register(testModule2)
         }
     }
 
@@ -111,9 +122,10 @@ class ReactionHandleTest {
         val capturedValues = mutableListOf<Unit>()
         val handler: suspend (Unit) -> Unit = { capturedValues.add(it) }
         val reactionHandle = ReactionHandle("test-reaction", signal, handler)
+        val testModule = createTestModule()
 
         // Act
-        reactionHandle.register("testModule")
+        reactionHandle.register(testModule)
 
         // Assert
         verify(exactly = 1) { SignalBus.register(signal, handler) }
@@ -126,9 +138,10 @@ class ReactionHandleTest {
         val signal = SignalHandle<ComplexData>("complexEvent")
         val handler: suspend (ComplexData) -> Unit = { /* Do nothing */ }
         val reactionHandle = ReactionHandle("test-reaction", signal, handler)
+        val testModule = createTestModule()
 
         // Act
-        reactionHandle.register("testModule")
+        reactionHandle.register(testModule)
 
         // Assert
         verify(exactly = 1) { SignalBus.register(signal, handler) }
@@ -140,13 +153,14 @@ class ReactionHandleTest {
         val signal = SignalHandle<String>("messageSignal")
         val capturedMessages = mutableListOf<String>()
         val handler: suspend (String) -> Unit = { capturedMessages.add(it) }
+        val testModule = createTestModule()
 
         // Capture and execute the handler when SignalBus.register is called
         val handlerSlot = slot<suspend (String) -> Unit>()
         justRun { SignalBus.register(eq(signal), capture(handlerSlot)) }
 
         val reactionHandle = ReactionHandle("test-reaction", signal, handler)
-        reactionHandle.register("testModule")
+        reactionHandle.register(testModule)
 
         // Act - simulate the SignalBus calling the handler
         val testMessage = "Hello, world!"
@@ -162,13 +176,14 @@ class ReactionHandleTest {
         val signal = SignalHandle<Int>("sharedSignal")
         val handler1: suspend (Int) -> Unit = { /* Do nothing */ }
         val handler2: suspend (Int) -> Unit = { /* Do nothing */ }
+        val testModule = createTestModule()
         
         val reaction1 = ReactionHandle("test-reaction", signal, handler1)
         val reaction2 = ReactionHandle("test-reaction", signal, handler2)
         
         // Act
-        reaction1.register("testModule")
-        reaction2.register("testModule")
+        reaction1.register(testModule)
+        reaction2.register(testModule)
         
         // Assert
         verify(exactly = 1) { SignalBus.register(signal, handler1) }

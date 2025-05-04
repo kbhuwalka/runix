@@ -6,6 +6,7 @@ import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import runix.primitives.module.AppModule
 import runix.primitives.signal.SignalHandle
 import runix.runtime.RuntimeScheduler
 import runix.temporal.FlowBinding
@@ -22,6 +23,13 @@ import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
 class MonitorHandleTest {
+
+    // Add this helper method to create a test module
+    private fun createTestModule(name: String = "TestModule"): AppModule {
+        return mockk {
+            every { this@mockk.name } returns name
+        }
+    }
 
     private val scheduler = TestCoroutineScheduler()
     private val testScope = TestScope(scheduler)
@@ -74,16 +82,18 @@ class MonitorHandleTest {
         }
     }
 
+    
     @Test
     fun `monitor registers successfully and prevents double registration`() {
         val testCondition = TestCondition()
         val monitor = MonitorHandle("test", testCondition, null)
+        val testModule = createTestModule()
 
-        monitor.register("test-module")
+        monitor.register(testModule)
         assertTrue(monitor.isRegistered(), "Monitor should report registered state")
 
         assertFailsWith<IllegalStateException> {
-            monitor.register("test-module")
+            monitor.register(testModule)
         }
     }
 
@@ -106,8 +116,9 @@ class MonitorHandleTest {
         
         val testCondition = TestCondition { ConditionEval.True }
         val monitor = MonitorHandle("test", testCondition, signal)
+        val testModule = createTestModule()
 
-        monitor.register("test-module")
+        monitor.register(testModule)
         monitor.start()
         advanceUntilIdle()
         
@@ -121,8 +132,9 @@ class MonitorHandleTest {
         
         val falseCondition = TestCondition(result = { ConditionEval.False })
         val monitor = MonitorHandle("false-monitor", falseCondition, signal)
+        val testModule = createTestModule()
 
-        monitor.register("test-module")
+        monitor.register(testModule)
         monitor.start()
         advanceUntilIdle()
         
@@ -136,8 +148,9 @@ class MonitorHandleTest {
         val delayedCondition = TestCondition(result = { ConditionEval.Delayed(delayMark) } )
 
         val monitor = MonitorHandle("delayed-monitor", delayedCondition, null)
+        val testModule = createTestModule()
 
-        monitor.register("test-module")
+        monitor.register(testModule)
         monitor.start()
         advanceUntilIdle()
         
@@ -154,8 +167,9 @@ class MonitorHandleTest {
     fun `monitor stop cancels future rechecks`() = testScope.runTest {
         val delayedCondition = TestCondition(result = { ConditionEval.Delayed(Time.markNow() + 10.seconds) })
         val monitor = MonitorHandle("stop-test", delayedCondition, null)
+        val testModule = createTestModule()
 
-        monitor.register("test-module")
+        monitor.register(testModule)
         monitor.start()
         advanceUntilIdle()
         
@@ -184,8 +198,9 @@ class MonitorHandleTest {
         )
 
         val monitor = MonitorHandle("evaluation-test", testCondition, null)
+        val testModule = createTestModule()
 
-        monitor.register("test-module")
+        monitor.register(testModule)
         monitor.start()
         advanceUntilIdle()
 
@@ -203,8 +218,9 @@ class MonitorHandleTest {
         )
 
         val monitor = MonitorHandle("single-eval", testCondition, null)
+        val testModule = createTestModule()
 
-        monitor.register("test-module")
+        monitor.register(testModule)
         monitor.start()
         advanceUntilIdle()
         
@@ -234,7 +250,9 @@ class MonitorHandleTest {
         )
         
         val monitor = MonitorHandle("time-based", testCondition, null)
-        monitor.register("test-module")
+        val testModule = createTestModule()
+        
+        monitor.register(testModule)
         monitor.start()
         advanceUntilIdle()
         

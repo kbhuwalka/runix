@@ -1,34 +1,43 @@
 package runix.runtime
 
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import io.mockk.verifySequence
 import runix.primitives.action.ActionHandle
+import runix.primitives.module.AppModule
 import runix.primitives.monitor.MonitorHandle
 import runix.primitives.reaction.ReactionHandle
 import kotlin.test.Test
 
 class DefaultModuleScopeTest {
 
-    private val testModuleName = "TestModule"
+    // Add helper method to create a mock AppModule
+    private fun createTestModule(name: String = "TestModule"): AppModule {
+        return mockk {
+            every { this@mockk.name } returns name
+        }
+    }
     
     @Test
     fun `constructor properly initializes moduleName`() {
-        val scope = DefaultModuleScope(testModuleName)
+        val testModule = createTestModule()
+        val scope = DefaultModuleScope(testModule)
         
-        // This is an indirect test via the activate method, since moduleName is private
+        // This is an indirect test via the activate method, since module is private
         val mockMonitor = mockk<MonitorHandle>(relaxed = true)
         with(scope) {
             +mockMonitor
         }
         scope.activate()
         
-        verify { mockMonitor.register(testModuleName) }
+        verify { mockMonitor.register(testModule) }
     }
 
     @Test
     fun `plus operator adds MonitorHandle to pending list`() {
-        val scope = DefaultModuleScope(testModuleName)
+        val testModule = createTestModule()
+        val scope = DefaultModuleScope(testModule)
         val monitor1 = mockk<MonitorHandle>(relaxed = true)
         val monitor2 = mockk<MonitorHandle>(relaxed = true)
 
@@ -41,14 +50,15 @@ class DefaultModuleScopeTest {
         
         // Verify both were registered in the order they were added
         verifySequence {
-            monitor1.register(testModuleName)
-            monitor2.register(testModuleName)
+            monitor1.register(testModule)
+            monitor2.register(testModule)
         }
     }
     
     @Test
     fun `plus operator adds ReactionHandle to pending list`() {
-        val scope = DefaultModuleScope(testModuleName)
+        val testModule = createTestModule()
+        val scope = DefaultModuleScope(testModule)
         val reaction1 = mockk<ReactionHandle<Unit>>(relaxed = true)
         val reaction2 = mockk<ReactionHandle<Unit>>(relaxed = true)
         
@@ -60,14 +70,15 @@ class DefaultModuleScopeTest {
         
         // Verify both were registered in the order they were added
         verifySequence {
-            reaction1.register(testModuleName)
-            reaction2.register(testModuleName)
+            reaction1.register(testModule)
+            reaction2.register(testModule)
         }
     }
     
     @Test
     fun `plus operator adds ActionHandle to pending list`() {
-        val scope = DefaultModuleScope(testModuleName)
+        val testModule = createTestModule()
+        val scope = DefaultModuleScope(testModule)
         val action1 = mockk<ActionHandle<*>>(relaxed = true)
         val action2 = mockk<ActionHandle<*>>(relaxed = true)
 
@@ -79,14 +90,15 @@ class DefaultModuleScopeTest {
         
         // Verify both were registered in the order they were added
         verifySequence {
-            action1.register(testModuleName)
-            action2.register(testModuleName)
+            action1.register(testModule)
+            action2.register(testModule)
         }
     }
 
     @Test
     fun `activate registers all pending primitives in the correct order`() {
-        val scope = DefaultModuleScope(testModuleName)
+        val testModule = createTestModule()
+        val scope = DefaultModuleScope(testModule)
         
         // Create mocks for each type
         val monitor = mockk<MonitorHandle>(relaxed = true)
@@ -105,15 +117,16 @@ class DefaultModuleScopeTest {
         
         // Verify registration order by type
         verifySequence {
-            monitor.register(testModuleName)
-            reaction.register(testModuleName)
-            action.register(testModuleName)
+            monitor.register(testModule)
+            reaction.register(testModule)
+            action.register(testModule)
         }
     }
     
     @Test
     fun `activate works with empty lists`() {
-        val scope = DefaultModuleScope(testModuleName)
+        val testModule = createTestModule()
+        val scope = DefaultModuleScope(testModule)
         
         // Should not throw any exceptions
         scope.activate()
@@ -121,7 +134,8 @@ class DefaultModuleScopeTest {
     
     @Test
     fun `plus supports multiple primitives of the same type`() {
-        val scope = DefaultModuleScope(testModuleName)
+        val testModule = createTestModule()
+        val scope = DefaultModuleScope(testModule)
 
         // Create multiple primitives of each type
         val monitors = List(3) { mockk<MonitorHandle>(relaxed = true) }
@@ -140,15 +154,16 @@ class DefaultModuleScopeTest {
 
         // Verify all were registered in the expected type order
         verifySequence {
-            monitors.forEach { it.register(testModuleName) }
-            reactions.forEach { it.register(testModuleName) }
-            actions.forEach { it.register(testModuleName) }
+            monitors.forEach { it.register(testModule) }
+            reactions.forEach { it.register(testModule) }
+            actions.forEach { it.register(testModule) }
         }
     }
     
     @Test
     fun `multiple activate calls register primitives only once`() {
-        val scope = DefaultModuleScope(testModuleName)
+        val testModule = createTestModule()
+        val scope = DefaultModuleScope(testModule)
         val monitor = mockk<MonitorHandle>(relaxed = true)
         
         with(scope) {
@@ -161,6 +176,6 @@ class DefaultModuleScopeTest {
         scope.activate()
         
         // Verify registration was only called once
-        verify(exactly = 1) { monitor.register(testModuleName) }
+        verify(exactly = 1) { monitor.register(testModule) }
     }
 }
