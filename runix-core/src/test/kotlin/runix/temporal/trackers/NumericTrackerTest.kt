@@ -1,23 +1,20 @@
 package runix.temporal.trackers
 
-import kotlin.test.BeforeTest
-import kotlin.test.AfterTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
-
-import kotlin.time.Duration.Companion.seconds
-
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestCoroutineScheduler
-import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.flow.MutableStateFlow
-
+import kotlinx.coroutines.test.runTest
 import runix.temporal.condition.ConditionEval
 import runix.temporal.time.TestSchedulerTimeProvider
 import runix.temporal.time.Time
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class NumericTrackerTest {

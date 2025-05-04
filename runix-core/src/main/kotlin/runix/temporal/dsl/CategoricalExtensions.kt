@@ -1,7 +1,7 @@
 package runix.temporal.dsl
 
 import kotlinx.coroutines.flow.StateFlow
-import runix.dsl.LabeledFlow
+import runix.primitives.LabeledFlow
 import runix.temporal.CategoricalLeaf
 import runix.temporal.MonitoredCondition
 import runix.temporal.condition.IsInState
@@ -52,7 +52,6 @@ fun <T : Enum<T>> StateFlow<T>.isIn(expected: T): MonitoredCondition =
 fun <T : Enum<T>> LabeledFlow<T>.isIn(expected: T): MonitoredCondition =
     CategoricalLeaf(flow, IsInState(expected))
 
-
 /**
  * Returns `True` if the current state has continuously matched [expected]
  * for at least [forDuration].
@@ -73,7 +72,6 @@ fun <T : Enum<T>> StateFlow<T>.hasBeenIn(expected: T, forDuration: Duration): Mo
  */
 fun <T : Enum<T>> LabeledFlow<T>.hasBeenIn(expected: T, forDuration: Duration): MonitoredCondition =
     CategoricalLeaf(flow, PersistedInState(expected, forDuration))
-
 
 /**
  * Returns `True` if the signal matched [expected] for at least [forDuration]
@@ -117,7 +115,6 @@ fun <T : Enum<T>> StateFlow<T>.wasEverIn(expected: T, inLast: Duration): Monitor
 fun <T : Enum<T>> LabeledFlow<T>.wasEverIn(expected: T, inLast: Duration): MonitoredCondition =
     CategoricalLeaf(flow, WasEverInState(expected, inLast))
 
-
 /**
  * Returns `True` if the signal transitioned into [expected]
  * and remained in that state for at least [forDuration], within the [inLast] window.
@@ -139,7 +136,6 @@ fun <T : Enum<T>> StateFlow<T>.transitionedTo(expected: T, forDuration: Duration
  */
 fun <T : Enum<T>> LabeledFlow<T>.transitionedTo(expected: T, forDuration: Duration = Duration.ZERO, inLast: Duration): MonitoredCondition =
     CategoricalLeaf(flow, TransitionedTo(expected, forDuration, inLast))
-
 
 /**
  * Returns `True` if the signal transitioned away from [expected]

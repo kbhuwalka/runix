@@ -11,7 +11,7 @@ import java.util.UUID
  */
 data class TraceContext(
     val traceId: UUID = UUID.randomUUID(),
-    val parentId: UUID? = null,
+    val parentId: UUID? = null
 ) {
     /**
      * Derives a new context for a child operation.

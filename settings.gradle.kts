@@ -1,6 +1,6 @@
 pluginManagement {
     repositories {
-        gradlePluginPortal()     // ✅ Needed for com.guardsquare.proguard
+        gradlePluginPortal()     //Needed for com.guardsquare.proguard
         mavenCentral()
         google()
     }
@@ -12,4 +12,3 @@ plugins {
 rootProject.name = "runix"
 
 include(":runix-core")
-include("examples")

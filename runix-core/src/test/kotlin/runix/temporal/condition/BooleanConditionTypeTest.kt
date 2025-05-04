@@ -8,7 +8,7 @@ import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import runix.internal.RuntimeScope
+import runix.runtime.internal.RuntimeScope
 import runix.temporal.time.TestSchedulerTimeProvider
 import runix.temporal.time.Time
 import runix.temporal.trackers.BooleanTracker
@@ -38,7 +38,6 @@ class BooleanConditionTypeTest {
     }
 
     private val flow = MutableStateFlow(false)
-    
 
     @Test
     fun `IsTrue returns True when flow is true`() = runTest(scheduler) {

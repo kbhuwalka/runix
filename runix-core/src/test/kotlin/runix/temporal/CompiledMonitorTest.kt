@@ -11,7 +11,7 @@ import kotlin.test.assertNotNull
 import kotlin.time.Duration
 
 class CompiledMonitorTest {
-    
+
     private class FakeTracker(
         var registeredKey: String? = null,
         var lastUpdateCallback: (() -> Unit)? = null

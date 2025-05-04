@@ -1,8 +1,8 @@
 package runix.temporal.dsl
 
-import runix.temporal.MonitoredCondition
 import runix.temporal.AllOf
 import runix.temporal.AnyOf
+import runix.temporal.MonitoredCondition
 import runix.temporal.Not
 
 /**

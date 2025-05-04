@@ -2,11 +2,11 @@
 package runix.temporal.trackers
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import runix.temporal.condition.ConditionEval
 import runix.temporal.time.TestSchedulerTimeProvider
 import runix.temporal.time.Time
@@ -22,7 +22,7 @@ import kotlin.time.ExperimentalTime
 class CategoricalTrackerTest {
 
     private val scheduler = TestCoroutineScheduler()
-    private val provider  = TestSchedulerTimeProvider(scheduler)
+    private val provider = TestSchedulerTimeProvider(scheduler)
 
     @BeforeTest
     fun setup() {

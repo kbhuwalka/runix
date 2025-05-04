@@ -56,7 +56,8 @@ abstract class MonitoredCondition {
         return CompiledMonitor(
             name = monitorName,
             condition = expression,
-            bindings = bindings)
+            bindings = bindings
+        )
     }
 
     /**

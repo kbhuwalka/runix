@@ -2,7 +2,7 @@ package runix.temporal.trackers
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
-import runix.internal.RuntimeScope
+import runix.runtime.internal.RuntimeScope
 import runix.temporal.condition.ConditionEval
 import runix.temporal.time.Time
 import runix.temporal.time.durationSince

@@ -1,8 +1,14 @@
 package runix.temporal
 
 import kotlinx.coroutines.flow.StateFlow
-import runix.temporal.condition.*
-import runix.temporal.trackers.*
+import runix.temporal.condition.BooleanConditionType
+import runix.temporal.condition.CategoricalConditionType
+import runix.temporal.condition.NumericConditionType
+import runix.temporal.condition.TemporalExpression
+import runix.temporal.trackers.BooleanTracker
+import runix.temporal.trackers.CategoricalTracker
+import runix.temporal.trackers.NumericTracker
+import runix.temporal.trackers.TrackerRegistry
 
 /**
  * Leaf condition nodes for signal evaluation.
@@ -25,7 +31,7 @@ internal class BooleanLeaf(
         bindings += FlowBinding(
             key = key,
             retention = type.retention,
-            createTracker = { onUpdate -> BooleanTracker(flow, type.retention, onUpdate= onUpdate) }
+            createTracker = { onUpdate -> BooleanTracker(flow, type.retention, onUpdate = onUpdate) }
         )
         return type.compileExpression(key, TrackerRegistry)
     }
@@ -43,7 +49,7 @@ internal class NumericLeaf(
         bindings += FlowBinding(
             key = key,
             retention = type.retention,
-            createTracker = { onUpdate -> NumericTracker(flow, type.retention, onUpdate= onUpdate) }
+            createTracker = { onUpdate -> NumericTracker(flow, type.retention, onUpdate = onUpdate) }
         )
         return type.compileExpression(key, TrackerRegistry)
     }
@@ -61,7 +67,7 @@ internal class CategoricalLeaf<T>(
         bindings += FlowBinding(
             key = key,
             retention = type.retention,
-            createTracker = { onUpdate -> CategoricalTracker(flow, type.retention, onUpdate= onUpdate) }
+            createTracker = { onUpdate -> CategoricalTracker(flow, type.retention, onUpdate = onUpdate) }
         )
         return type.compileExpression(key, TrackerRegistry)
     }

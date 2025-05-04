@@ -4,7 +4,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import runix.internal.RuntimeScope
+import runix.runtime.internal.RuntimeScope
 import runix.temporal.time.Time
 import kotlin.time.Duration
 
@@ -30,9 +30,9 @@ internal abstract class BaseTracker<T>(
     flow: StateFlow<T>,
     retention: Duration,
     /**
-    * Collector scope—defaults to the global RuntimeScope but can be overridden
-    * in tests or alternate contexts.
-    */
+     * Collector scope—defaults to the global RuntimeScope but can be overridden
+     * in tests or alternate contexts.
+     */
     scope: CoroutineScope = RuntimeScope.scope,
     private val onUpdate: () -> Unit
 ) {
@@ -42,7 +42,7 @@ internal abstract class BaseTracker<T>(
     /** Time-stamped history buffer, seeded with the current value */
     protected val history: ValueHistory<T> =
         ValueHistory(
-            initial   = ValueWithMark(flow.value, Time.markNow()),
+            initial = ValueWithMark(flow.value, Time.markNow()),
             retention = retention
         )
 
