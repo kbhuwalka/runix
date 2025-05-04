@@ -1,5 +1,6 @@
 package runix.primitives.monitor
 
+import runix.runtime.Activatable
 import runix.primitives.module.AppModule
 import runix.primitives.signal.SignalHandle
 import runix.runtime.RuntimeScheduler
@@ -22,14 +23,14 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * Registration must happen via `+batteryLow` inside a module `defineBehavior {}` block.
  *
- * Once registered and started, the monitor evaluates its condition in real-time and
+ * Once registered and activated, the monitor evaluates its condition in real-time and
  * can emit a signal when that condition evaluates to `true`.
  */
 class MonitorHandle internal constructor(
     private val name: String,
     private val condition: MonitoredCondition,
     private val signal: SignalHandle<Unit>?
-) : Registerable {
+) : Registerable, Activatable {
     private val guard = RegistrationGuard()
     private lateinit var compiled: CompiledMonitor
     private var started = AtomicBoolean(false)
@@ -46,8 +47,11 @@ class MonitorHandle internal constructor(
         compiled = condition.compile(name)
     }
 
-    internal fun start() {
-        check(guard.isRegistered()) { "Monitor '$name' must be registered before starting." }
+    /**
+     * Activates this monitor, making it start evaluating its condition.
+     */
+    override fun activate() {
+        check(guard.isRegistered()) { "Monitor '$name' must be registered before activating." }
         if (started.get()) return
         started.set(true)
 
@@ -57,9 +61,9 @@ class MonitorHandle internal constructor(
     }
 
     /**
-     * Stops the monitor and unregisters all observers.
+     * Deactivates this monitor, stopping condition evaluation.
      */
-    internal fun stop() {
+    override fun deactivate() {
         if (!started.get()) return
         compiled.stop()
         RuntimeScheduler.cancelRecheck(this)

@@ -4,9 +4,11 @@ package runix.temporal.trackers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import runix.runtime.internal.RuntimeScope
 import runix.temporal.condition.ConditionEval
 import runix.temporal.time.TestSchedulerTimeProvider
 import runix.temporal.time.Time
@@ -26,11 +28,13 @@ class CategoricalTrackerTest {
 
     @BeforeTest
     fun setup() {
+        RuntimeScope.install(TestScope(scheduler))
         Time.setProvider(provider)
     }
 
     @AfterTest
     fun tearDown() {
+        RuntimeScope.clear()
         Time.resetToRealTime()
     }
 

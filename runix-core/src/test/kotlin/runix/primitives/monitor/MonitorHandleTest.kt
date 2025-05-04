@@ -13,9 +13,14 @@ import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import runix.primitives.module.AppModule
 import runix.primitives.signal.SignalHandle
 import runix.runtime.RuntimeScheduler
+import runix.runtime.internal.RuntimeScope
 import runix.temporal.FlowBinding
 import runix.temporal.MonitoredCondition
 import runix.temporal.condition.ConditionEval
@@ -23,12 +28,9 @@ import runix.temporal.time.TestSchedulerTimeProvider
 import runix.temporal.time.Time
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
-import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
@@ -36,7 +38,7 @@ import kotlin.time.ExperimentalTime
 @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
 class MonitorHandleTest {
 
-    // Add this helper method to create a test module
+    // Create test module helper
     private fun createTestModule(name: String = "TestModule"): AppModule {
         return mockk {
             every { this@mockk.name } returns name
@@ -46,34 +48,36 @@ class MonitorHandleTest {
     private val scheduler = TestCoroutineScheduler()
     private val testScope = TestScope(scheduler)
     private val provider = TestSchedulerTimeProvider(scheduler)
-
-    // Mock the RuntimeScheduler for testing
-    private val mockRuntimeScheduler = mockk<RuntimeScheduler>(relaxed = true)
-
     private val recheckJobSlot = slot<suspend () -> Unit>()
 
-    @BeforeTest
+    @BeforeEach
     fun setup() {
+        // Set up time provider for testing
         Time.setProvider(provider)
-
-        // Clear the slot for each test
+        
+        // Install test scope
+        RuntimeScope.install(testScope)
+        
+        // Clear the job slot for each test
         if (recheckJobSlot.isCaptured) {
             recheckJobSlot.clear()
         }
-
-        // Mock the static scheduleRecheck and cancelRecheck methods
+        
+        // Mock RuntimeScheduler static methods
         mockkObject(RuntimeScheduler)
-
-        // Configure the scheduleRecheck mock to capture the job lambda
+        
+        // Set up scheduleRecheck to capture the job lambda
         every {
             RuntimeScheduler.scheduleRecheck(any(), any(), capture(recheckJobSlot))
-        } returns Unit
-
+        } answers { }
+        
+        // Make cancelRecheck a no-op
         justRun { RuntimeScheduler.cancelRecheck(any()) }
     }
 
-    @AfterTest
+    @AfterEach
     fun tearDown() {
+        RuntimeScope.clear()
         Time.resetToRealTime()
         unmockkAll()
     }
@@ -103,7 +107,7 @@ class MonitorHandleTest {
         monitor.register(testModule)
         assertTrue(monitor.isRegistered(), "Monitor should report registered state")
 
-        assertFailsWith<IllegalStateException> {
+        assertThrows<IllegalStateException> {
             monitor.register(testModule)
         }
     }
@@ -113,13 +117,13 @@ class MonitorHandleTest {
         val testCondition = TestCondition()
         val monitor = MonitorHandle("unregistered", testCondition, null)
 
-        assertFailsWith<IllegalStateException> {
-            monitor.start()
+        assertThrows<IllegalStateException> {
+            monitor.activate()
         }
     }
 
     @Test
-    fun `monitor emits signal when condition evaluates to true`() = testScope.runTest {
+    fun `monitor emits signal when condition evaluates to true`() = runTest {
         val emitted = AtomicBoolean(false)
 
         val signal = mockk<SignalHandle<Unit>>(relaxed = true)
@@ -130,7 +134,7 @@ class MonitorHandleTest {
         val testModule = createTestModule()
 
         monitor.register(testModule)
-        monitor.start()
+        monitor.activate()
         advanceUntilIdle()
 
         assertTrue(emitted.get(), "Signal should have been emitted for ConditionEval.True")
@@ -138,7 +142,7 @@ class MonitorHandleTest {
     }
 
     @Test
-    fun `monitor does not emit signal when condition evaluates to false`() = testScope.runTest {
+    fun `monitor does not emit signal when condition evaluates to false`() = runTest {
         val signal = mockk<SignalHandle<Unit>>(relaxed = true)
 
         val falseCondition = TestCondition(result = { ConditionEval.False })
@@ -146,14 +150,14 @@ class MonitorHandleTest {
         val testModule = createTestModule()
 
         monitor.register(testModule)
-        monitor.start()
+        monitor.activate()
         advanceUntilIdle()
 
         verify(exactly = 0) { signal.emit(Unit) }
     }
 
     @Test
-    fun `monitor reschedules on delayed evaluation`() = testScope.runTest {
+    fun `monitor reschedules on delayed evaluation`() = runTest {
         val delayTime = 200.milliseconds
         val delayMark = Time.markNow() + delayTime
         val delayedCondition = TestCondition(result = { ConditionEval.Delayed(delayMark) })
@@ -162,7 +166,7 @@ class MonitorHandleTest {
         val testModule = createTestModule()
 
         monitor.register(testModule)
-        monitor.start()
+        monitor.activate()
         advanceUntilIdle()
 
         verify {
@@ -175,19 +179,19 @@ class MonitorHandleTest {
     }
 
     @Test
-    fun `monitor stop cancels future rechecks`() = testScope.runTest {
+    fun `monitor stop cancels future rechecks`() = runTest {
         val delayedCondition = TestCondition(result = { ConditionEval.Delayed(Time.markNow() + 10.seconds) })
         val monitor = MonitorHandle("stop-test", delayedCondition, null)
         val testModule = createTestModule()
 
         monitor.register(testModule)
-        monitor.start()
+        monitor.activate()
         advanceUntilIdle()
 
         // Clear verification history
         clearMocks(RuntimeScheduler)
 
-        monitor.stop()
+        monitor.deactivate()
 
         verify { RuntimeScheduler.cancelRecheck(eq(monitor)) }
     }
@@ -198,11 +202,11 @@ class MonitorHandleTest {
         val monitor = MonitorHandle("untouched", testCondition, null)
 
         // Should not throw exceptions
-        monitor.stop()
+        monitor.deactivate()
     }
 
     @Test
-    fun `monitor correctly starts evaluation pipeline`() = testScope.runTest {
+    fun `monitor correctly starts evaluation pipeline`() = runTest {
         val monitorLog = mutableListOf<String>()
         val testCondition = TestCondition(
             onEvaluate = { monitorLog += "evaluated" }
@@ -212,7 +216,7 @@ class MonitorHandleTest {
         val testModule = createTestModule()
 
         monitor.register(testModule)
-        monitor.start()
+        monitor.activate()
         advanceUntilIdle()
 
         assertTrue(
@@ -222,7 +226,7 @@ class MonitorHandleTest {
     }
 
     @Test
-    fun `monitor does not re-evaluate if already started`() = testScope.runTest {
+    fun `monitor does not re-evaluate if already started`() = runTest {
         val evalCount = AtomicInteger(0)
         val testCondition = TestCondition(
             onEvaluate = { evalCount.incrementAndGet() }
@@ -232,11 +236,11 @@ class MonitorHandleTest {
         val testModule = createTestModule()
 
         monitor.register(testModule)
-        monitor.start()
+        monitor.activate()
         advanceUntilIdle()
 
         // Try to start again
-        monitor.start()
+        monitor.activate()
         advanceUntilIdle()
 
         assertEquals(
@@ -247,7 +251,7 @@ class MonitorHandleTest {
     }
 
     @Test
-    fun `delayed evaluation can be triggered multiple times`() = testScope.runTest {
+    fun `delayed evaluation can be triggered multiple times`() = runTest {
         val evaluations = AtomicInteger(0)
         val testCondition = TestCondition(
             result = {
@@ -264,7 +268,7 @@ class MonitorHandleTest {
         val testModule = createTestModule()
 
         monitor.register(testModule)
-        monitor.start()
+        monitor.activate()
         advanceUntilIdle()
 
         // First evaluation happens on start

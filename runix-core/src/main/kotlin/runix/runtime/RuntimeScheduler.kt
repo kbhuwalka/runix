@@ -1,5 +1,6 @@
 package runix.runtime
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -19,10 +20,34 @@ import kotlin.time.ComparableTimeMark
  */
 internal object RuntimeScheduler {
     private val scope = RuntimeScope.scope
+    private var isRunning = false
 
     /** Scheduled rechecks indexed by monitor name */
     private val recheckJobs = mutableMapOf<MonitorHandle, Job>()
     private val lock = Mutex()
+
+
+    fun start() {
+        check(!isRunning) { "RuntimeScheduler is already running." }
+        isRunning = true
+
+        // TODO: Start internal timer or scheduling loop if needed
+    }
+
+    fun stop() {
+        if (!isRunning) return
+        isRunning = false
+
+        recheckJobs.values.forEach { it.cancel() }
+        recheckJobs.clear()
+
+        // TODO: Clean up any delayed jobs, timers, etc.
+    }
+
+    internal fun ensureStarted(): CoroutineScope {
+        check(isRunning) { "RuntimeScheduler is not running." }
+        return scope
+    }
 
     /**
      * Schedule a re-evaluation at the given [mark] for [monitorId].
@@ -51,13 +76,5 @@ internal object RuntimeScheduler {
                 recheckJobs.remove(monitor)?.cancel()
             }
         }
-    }
-
-    /**
-     * Gracefully stop the scheduler and clear pending tasks.
-     */
-    fun shutdown() {
-        scope.cancel("RuntimeScheduler shutdown")
-        recheckJobs.clear()
     }
 }

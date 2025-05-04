@@ -1,6 +1,7 @@
 package runix.runtime
 
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import runix.runtime.internal.RuntimeScope
 import runix.primitives.module.AppModule
 
@@ -11,60 +12,83 @@ import runix.primitives.module.AppModule
  * behavior modules, starts and stops them explicitly, and provides optional
  * lifecycle hooks for external integration or setup logic.
  *
- * Developers create an App declaratively using the DSL:
+ * Developers create an App declaratively:
  *
  * ```
- * val app = App {
+ * object RobotApp : App {
+ *   // Install modules directly in class body
  *   install(PowerModule)
  *   install(RecoveryModule)
  *
- *   onStart { println("App ready") }
- *   onStop { println("Clean shutdown") }
+ *   // Set lifecycle hooks directly
+ *   didStart {
+ *     println("App ready")
+ *   }
+ *
+ *   willStop {
+ *     println("Clean shutdown")
+ *   }
  * }
- *
- * runBlocking { app.start() }
  * ```
- *
- * @constructor Use [App] DSL entrypoint to construct an instance.
- * @property modules The set of modules or installable components
- * @property startHook Suspendable lambdas invoked after modules, before modules
- * @property stopHook Suspendable lambdas invoked on shutdown
  */
-class App internal constructor(
-    private val modules: List<AppModule>,
-    private val startHook: (suspend () -> Unit)?,
-    private val stopHook: (suspend () -> Unit)?
-) {
-    private val scope = RuntimeScope.scope
-
+abstract class App : Activatable {
+    private val modules = mutableListOf<AppModule>()
+    private var didStartBlock: (suspend () -> Unit)? = null
+    private var willStopBlock: (suspend () -> Unit)? = null
+    
     /**
-     * Starts the application: installs components, runs onStart hooks,
-     * and activates all registered modules.
+     * Installs a module into this app.
+     * Can be called directly in the app's class body.
      */
-    suspend fun start() {
-        modules.forEach { it.install(this) }
-        startHook?.invoke()
-        modules.forEach { it.onStart() }
+    fun install(module: AppModule) {
+        modules.add(module)
+        module.setApp(this)
     }
-
+    
     /**
-     * Shuts down the application: deactivates modules and runs cleanup hooks.
+     * Register a hook to be called after all modules are activated.
+     * Can be called directly in the app's class body.
      */
-    suspend fun stop() {
-        modules.reversed().forEach { it.onStop() }
-        stopHook?.invoke()
-        scope.cancel("RunixApp shutdown")
+    fun didStart(block: suspend () -> Unit) {
+        didStartBlock = block
     }
-
-    companion object {
-        /**
-         * DSL entrypoint for building a Runix application.
-         *
-         * Use `install(...)` to register modules and components,
-         * and `onStart {}` / `onStop {}` to customize lifecycle behavior.
-         */
-        operator fun invoke(init: AppBuilder.() -> Unit): App {
-            return AppBuilder().apply(init).build()
+    
+    /**
+     * Register a hook to be called before any modules are deactivated.
+     * Can be called directly in the app's class body.
+     */
+    fun willStop(block: suspend () -> Unit) {
+        willStopBlock = block
+    }
+    
+    /**
+     * Start the application: install components, activate all modules,
+     * and run the didStart hook.
+     */
+    override fun activate() {
+        // Activate all modules
+        modules.forEach { it.activate() }
+        
+        // Execute developer hook
+        RuntimeScope.scope.launch {
+            didStartBlock?.invoke()
         }
+    }
+    
+    /**
+     * Gracefully shutdown the application: run the willStop hook,
+     * deactivate all modules in reverse order.
+     */
+    override fun deactivate() {
+        // Execute developer hook first
+        RuntimeScope.scope.launch {
+            willStopBlock?.invoke()
+        }
+        
+        // Then deactivate all modules in reverse order
+        modules.asReversed().forEach { it.deactivate() }
+        
+        // Finally cancel the runtime scope
+        RuntimeScope.scope.cancel("App shutdown")
     }
 }

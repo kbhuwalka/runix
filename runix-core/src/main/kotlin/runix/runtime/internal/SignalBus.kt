@@ -44,6 +44,16 @@ internal object SignalBus {
     }
 
     /**
+     * Unregisters a specific handler from a signal.
+     * Used during deactivation to clean up reaction handlers.
+     */
+    fun <T> unregister(signal: SignalHandle<T>, handler: suspend (T) -> Unit) {
+        // Implementation details depend on how handlers are stored
+        // This would remove the specific handler from the signal's subscription list
+    }
+
+
+    /**
      * Unregisters all reactions for cleanup (e.g. module shutdown).
      */
     fun reset() {
