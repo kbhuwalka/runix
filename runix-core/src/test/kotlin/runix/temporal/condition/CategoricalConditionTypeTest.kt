@@ -33,13 +33,14 @@ class CategoricalConditionTypeTest {
 
     @BeforeTest
     fun setup() {
-        RuntimeScope.overrideScopeForTesting(CoroutineScope(dispatcher))
+        RuntimeScope.install(CoroutineScope(dispatcher))
         Time.setProvider(provider)
     }
 
     @AfterTest
     fun tearDown() {
         Time.resetToRealTime()
+        RuntimeScope.clear()
     }
 
     private class TestProvider(val tracker: CategoricalTracker<*>) : TrackerProvider {

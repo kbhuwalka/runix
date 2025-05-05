@@ -1,18 +1,11 @@
 package runix.primitives.reaction
 
-import io.mockk.every
-import io.mockk.justRun
-import io.mockk.mockk
-import io.mockk.mockkObject
-import io.mockk.slot
-import io.mockk.unmockkObject
-import io.mockk.verify
+import io.mockk.*
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import reaction
 import runix.primitives.module.AppModule
 import runix.primitives.signal.SignalHandle
 import runix.runtime.internal.SignalBus
@@ -30,7 +23,9 @@ class ReactionHandleTest {
     @BeforeEach
     fun setup() {
         mockkObject(SignalBus)
-        justRun { SignalBus.register<Any?>(any(), any()) }
+        // Using coJustRun for suspend functions
+        coJustRun { SignalBus.register<Any?>(any(), any()) }
+        coJustRun { SignalBus.unregister<Any?>(any(), any()) }
     }
 
     @AfterEach
@@ -39,28 +34,28 @@ class ReactionHandleTest {
     }
 
     @Test
-    fun `reaction function creates ReactionHandle with correct signal and handler`() {
+    fun `reaction function creates ReactionHandle with correct signal and handler`() = runTest {
         // Arrange
         val signalName = "testSignal"
         val signal = SignalHandle<String>(signalName)
         val handler: suspend (String) -> Unit = { /* Do nothing */ }
-        val testModule = createTestModule()
 
         // Act
         val reactionHandle = reaction("test-reaction", signal, handler)
 
         // Assert
-        // Verify by testing registration behavior since we don't have direct property access
-        justRun { SignalBus.register(signal, handler) }
+        assertEquals("test-reaction", reactionHandle.name)
+        // Indirectly test the private fields via the activate method
+        val testModule = createTestModule()
         reactionHandle.register(testModule)
-        verify(exactly = 1) { SignalBus.register(signal, handler) }
+        reactionHandle.activate()
+        coVerify(exactly = 1) { SignalBus.register(signal, reactionHandle) }
     }
 
     @Test
-    fun `toString returns formatted string with signal name`() {
+    fun `toString returns formatted string with reaction name`() {
         // Arrange
-        val signalName = "batteryLow"
-        val signal = SignalHandle<Unit>(signalName)
+        val signal = SignalHandle<Unit>("batteryLow")
         val handler: suspend (Unit) -> Unit = { /* Do nothing */ }
         val reactionHandle = ReactionHandle("test-reaction", signal, handler)
 
@@ -72,7 +67,7 @@ class ReactionHandleTest {
     }
 
     @Test
-    fun `register forwards handler to SignalBus`() {
+    fun `register only establishes ownership without activating`() {
         // Arrange
         val signal = SignalHandle<Int>("numericSignal")
         val handler: suspend (Int) -> Unit = { /* Do nothing */ }
@@ -82,8 +77,54 @@ class ReactionHandleTest {
         // Act
         reactionHandle.register(testModule)
 
+        // Assert - should not have registered with SignalBus yet
+        coVerify(exactly = 0) { SignalBus.register(any<SignalHandle<Int>>(), any()) }
+    }
+
+    @Test
+    fun `activate registers handler with SignalBus`() = runTest {
+        // Arrange
+        val signal = SignalHandle<Int>("numericSignal")
+        val handler: suspend (Int) -> Unit = { /* Do nothing */ }
+        val reactionHandle = ReactionHandle("test-reaction", signal, handler)
+        val testModule = createTestModule()
+
+        // Act
+        reactionHandle.register(testModule)
+        reactionHandle.activate()
+
         // Assert
-        verify(exactly = 1) { SignalBus.register(signal, handler) }
+        coVerify(exactly = 1) { SignalBus.register(signal, reactionHandle) }
+    }
+
+    @Test
+    fun `deactivate unregisters handler from SignalBus`() = runTest {
+        // Arrange
+        val signal = SignalHandle<Int>("numericSignal")
+        val handler: suspend (Int) -> Unit = { /* Do nothing */ }
+        val reactionHandle = ReactionHandle("test-reaction", signal, handler)
+        val testModule = createTestModule()
+
+        // Act
+        reactionHandle.register(testModule)
+        reactionHandle.activate()
+        reactionHandle.deactivate()
+
+        // Assert
+        coVerify(exactly = 1) { SignalBus.unregister(signal, reactionHandle) }
+    }
+
+    @Test
+    fun `activate without registration throws exception`() = runTest {
+        // Arrange
+        val signal = SignalHandle<Boolean>("flagSignal")
+        val handler: suspend (Boolean) -> Unit = { /* Do nothing */ }
+        val reactionHandle = ReactionHandle("test-reaction", signal, handler)
+
+        // Act & Assert
+        assertThrows<IllegalStateException> {
+            reactionHandle.activate()
+        }
     }
 
     @Test
@@ -122,7 +163,41 @@ class ReactionHandleTest {
     }
 
     @Test
-    fun `register with Unit signal works correctly`() {
+    fun `multiple activate calls only register once`() = runTest {
+        // Arrange
+        val signal = SignalHandle<String>("repeatedActivation")
+        val handler: suspend (String) -> Unit = { /* Do nothing */ }
+        val reactionHandle = ReactionHandle("test-reaction", signal, handler)
+        val testModule = createTestModule()
+
+        // Act
+        reactionHandle.register(testModule)
+        reactionHandle.activate()
+        reactionHandle.activate() // Second call should be ignored
+        reactionHandle.activate() // Third call should be ignored
+
+        // Assert
+        coVerify(exactly = 1) { SignalBus.register(signal, reactionHandle) }
+    }
+
+    @Test
+    fun `deactivate without activation does nothing`() = runTest {
+        // Arrange
+        val signal = SignalHandle<String>("noActivation")
+        val handler: suspend (String) -> Unit = { /* Do nothing */ }
+        val reactionHandle = ReactionHandle("test-reaction", signal, handler)
+        val testModule = createTestModule()
+
+        // Act
+        reactionHandle.register(testModule)
+        reactionHandle.deactivate() // Should do nothing since not activated
+
+        // Assert
+        coVerify(exactly = 0) { SignalBus.unregister(any<SignalHandle<String>>(), any()) }
+    }
+
+    @Test
+    fun `register with Unit signal works correctly with activation`() = runTest {
         // Arrange
         val signal = SignalHandle<Unit>("simpleEvent")
         val capturedValues = mutableListOf<Unit>()
@@ -132,25 +207,10 @@ class ReactionHandleTest {
 
         // Act
         reactionHandle.register(testModule)
+        reactionHandle.activate()
 
         // Assert
-        verify(exactly = 1) { SignalBus.register(signal, handler) }
-    }
-
-    @Test
-    fun `register with complex data type works correctly`() {
-        // Arrange
-        data class ComplexData(val id: String, val value: Int)
-        val signal = SignalHandle<ComplexData>("complexEvent")
-        val handler: suspend (ComplexData) -> Unit = { /* Do nothing */ }
-        val reactionHandle = ReactionHandle("test-reaction", signal, handler)
-        val testModule = createTestModule()
-
-        // Act
-        reactionHandle.register(testModule)
-
-        // Assert
-        verify(exactly = 1) { SignalBus.register(signal, handler) }
+        coVerify(exactly = 1) { SignalBus.register(signal, reactionHandle) }
     }
 
     @Test
@@ -162,37 +222,68 @@ class ReactionHandleTest {
         val testModule = createTestModule()
 
         // Capture and execute the handler when SignalBus.register is called
-        val handlerSlot = slot<suspend (String) -> Unit>()
-        justRun { SignalBus.register(eq(signal), capture(handlerSlot)) }
+        val reactionSlot = slot<ReactionHandle<String>>()
+        coJustRun { SignalBus.register(eq(signal), capture(reactionSlot)) }
 
         val reactionHandle = ReactionHandle("test-reaction", signal, handler)
         reactionHandle.register(testModule)
+        reactionHandle.activate()
 
         // Act - simulate the SignalBus calling the handler
         val testMessage = "Hello, world!"
-        handlerSlot.captured.invoke(testMessage)
+        reactionSlot.captured.handler.invoke(testMessage)
 
         // Assert
         assertEquals(listOf(testMessage), capturedMessages)
     }
 
     @Test
-    fun `multiple reactions can be registered to the same signal`() {
+    fun `multiple reactions can be registered and activated for the same signal`() = runTest {
         // Arrange
         val signal = SignalHandle<Int>("sharedSignal")
         val handler1: suspend (Int) -> Unit = { /* Do nothing */ }
         val handler2: suspend (Int) -> Unit = { /* Do nothing */ }
         val testModule = createTestModule()
 
-        val reaction1 = ReactionHandle("test-reaction", signal, handler1)
-        val reaction2 = ReactionHandle("test-reaction", signal, handler2)
+        val reaction1 = ReactionHandle("reaction-1", signal, handler1)
+        val reaction2 = ReactionHandle("reaction-2", signal, handler2)
 
         // Act
         reaction1.register(testModule)
         reaction2.register(testModule)
+        reaction1.activate()
+        reaction2.activate()
 
         // Assert
-        verify(exactly = 1) { SignalBus.register(signal, handler1) }
-        verify(exactly = 1) { SignalBus.register(signal, handler2) }
+        coVerify(exactly = 1) { SignalBus.register(signal, reaction1) }
+        coVerify(exactly = 1) { SignalBus.register(signal, reaction2) }
+    }
+
+    @Test
+    fun `lifecycle of activation and deactivation works correctly`() = runTest {
+        // Arrange
+        val signal = SignalHandle<String>("lifecycleSignal")
+        val handler: suspend (String) -> Unit = { /* Do nothing */ }
+        val reactionHandle = ReactionHandle("test-reaction", signal, handler)
+        val testModule = createTestModule()
+
+        // Act & Assert - Full lifecycle
+        reactionHandle.register(testModule)
+
+        // First activation
+        reactionHandle.activate()
+        coVerify(exactly = 1) { SignalBus.register(signal, reactionHandle) }
+
+        // Deactivation
+        reactionHandle.deactivate()
+        coVerify(exactly = 1) { SignalBus.unregister(signal, reactionHandle) }
+
+        // Second activation
+        reactionHandle.activate()
+        coVerify(exactly = 2) { SignalBus.register(signal, reactionHandle) }
+
+        // Second deactivation
+        reactionHandle.deactivate()
+        coVerify(exactly = 2) { SignalBus.unregister(signal, reactionHandle) }
     }
 }

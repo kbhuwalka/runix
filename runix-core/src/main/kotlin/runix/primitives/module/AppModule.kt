@@ -1,8 +1,18 @@
 package runix.primitives.module
 
-import runix.annotations.Internal
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import runix.primitives.action.ActionHandle
+import runix.primitives.monitor.MonitorHandle
+import runix.primitives.reaction.ReactionHandle
+import runix.runtime.Activatable
 import runix.runtime.App
-import runix.runtime.Installable
+import runix.runtime.DefaultModuleScope
+import runix.runtime.ModuleScope
+import runix.runtime.internal.BehaviorRegistry
+import runix.runtime.internal.RuntimeScope
 
 /**
  * A behavioral unit in a Runix application that declares and owns:
@@ -15,30 +25,114 @@ import runix.runtime.Installable
  * - Declarative
  * - Explicitly composable
  * - Testable in isolation
+ *
+ * Example:
+ * ```
+ * object PowerModule : AppModule("PowerModule") {
+ *   // Declare primitives
+ *   private val batteryLow = monitor("batteryLow") {
+ *     batteryLevel < 20.0
+ *   } emit batteryLowSignal
+ * 
+ *   // Configure the module in the init block
+ *   init {
+ *     // Register behavior
+ *     defineBehavior {
+ *       +batteryLow
+ *       +powerOffReaction
+ *     }
+ *   
+ *     // Set lifecycle hooks
+ *     didStart { 
+ *       logger.info("Power module active")
+ *     }
+ *     
+ *     willStop {
+ *       logger.info("Power module shutting down")
+ *     }
+ *   }
+ * }
+ * ```
  */
-@OptIn(Internal::class)
-interface AppModule : Installable {
-    /**
-     * A stable name used for traceability and diagnostics.
-     */
+abstract class AppModule(
     val name: String
-
+) : Activatable {
+    // Primitives collections
+    private val monitors = mutableListOf<MonitorHandle>()
+    private val reactions = mutableListOf<ReactionHandle<*>>()
+    private val actions = mutableListOf<ActionHandle<*>>()
+    
+    // Parent app reference, set during installation
+    private var app: App? = null
+    
+    // Lifecycle hooks
+    private var didStartBlock: (suspend () -> Unit)? = null
+    private var willStopBlock: (suspend () -> Unit)? = null
+    
     /**
-     * Called when the app is started and the module should begin execution.
-     * Use this to register monitors, start behaviors, etc.
+     * Defines behavior for this module by registering primitives.
+     * Should be called from the module's init block.
      */
-    fun onStart()
-
+    fun defineBehavior(block: ModuleScope.() -> Unit) {
+        BehaviorRegistry.claim(this)
+        
+        val scope = DefaultModuleScope()
+        scope.block()
+        
+        // Store primitives for lifecycle management
+        monitors.addAll(scope.getMonitors())
+        reactions.addAll(scope.getReactions())
+        actions.addAll(scope.getActions())
+        
+        // Register all primitives
+        monitors.forEach { it.register(this) }
+        reactions.forEach { it.register(this) }
+        actions.forEach { it.register(this) }
+    }
+    
     /**
-     * Called when the app is shutting down. Use to cancel flows or clean up.
+     * Register a callback to be invoked after all primitives are activated.
+     * Should be called from the module's init block.
      */
-    fun onStop() {}
-
+    fun didStart(block: suspend () -> Unit) {
+        didStartBlock = block
+    }
+    
     /**
-     * DO NOT call manually. This is invoked internally by the App to allow
-     * the framework to register lifecycle structure. Behavior must be declared in [onStart].
+     * Register a callback to be invoked before primitives are deactivated.
+     * Should be called from the module's init block.
      */
-    override fun install(app: App) {
-        // Default install does nothing; the app will call onStart/onStop explicitly
+    fun willStop(block: suspend () -> Unit) {
+        willStopBlock = block
+    }
+    
+    /**
+     * Sets the parent app for this module. Called internally by App during installation.
+     */
+    internal fun setApp(app: App) {
+        this.app = app
+    }
+    
+    /**
+     * Activates all primitives in this module.
+     * Called internally by the runtime - do not call directly.
+     */
+    override suspend fun activate() {
+        reactions.forEach { it.activate() }
+        monitors.forEach { it.activate() }
+        didStartBlock?.invoke()
+    }
+    
+    /**
+     * Deactivates all primitives in this module.
+     * Called internally by the runtime - do not call directly.
+     */
+    override suspend fun deactivate() {
+        // Execute developer hook first - BLOCKING to ensure completion
+        willStopBlock?.invoke()
+        
+        // Then stop all primitives in reverse order
+        reactions.asReversed().forEach { it.deactivate() }
+        monitors.asReversed().forEach { it.deactivate() }
     }
 }

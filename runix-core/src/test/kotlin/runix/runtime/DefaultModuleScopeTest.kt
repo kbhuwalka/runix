@@ -1,43 +1,27 @@
 package runix.runtime
 
-import io.mockk.every
 import io.mockk.mockk
-import io.mockk.verify
-import io.mockk.verifySequence
+import org.junit.jupiter.api.Test
 import runix.primitives.action.ActionHandle
-import runix.primitives.module.AppModule
 import runix.primitives.monitor.MonitorHandle
 import runix.primitives.reaction.ReactionHandle
-import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class DefaultModuleScopeTest {
 
-    // Add helper method to create a mock AppModule
-    private fun createTestModule(name: String = "TestModule"): AppModule {
-        return mockk {
-            every { this@mockk.name } returns name
-        }
-    }
-
     @Test
-    fun `constructor properly initializes moduleName`() {
-        val testModule = createTestModule()
-        val scope = DefaultModuleScope(testModule)
+    fun `constructor initializes empty collections`() {
+        val scope = DefaultModuleScope()
 
-        // This is an indirect test via the activate method, since module is private
-        val mockMonitor = mockk<MonitorHandle>(relaxed = true)
-        with(scope) {
-            +mockMonitor
-        }
-        scope.activate()
-
-        verify { mockMonitor.register(testModule) }
+        assertTrue(scope.getMonitors().isEmpty())
+        assertTrue(scope.getReactions().isEmpty())
+        assertTrue(scope.getActions().isEmpty())
     }
 
     @Test
     fun `plus operator adds MonitorHandle to pending list`() {
-        val testModule = createTestModule()
-        val scope = DefaultModuleScope(testModule)
+        val scope = DefaultModuleScope()
         val monitor1 = mockk<MonitorHandle>(relaxed = true)
         val monitor2 = mockk<MonitorHandle>(relaxed = true)
 
@@ -46,19 +30,15 @@ class DefaultModuleScopeTest {
             +monitor2
         }
 
-        scope.activate()
-
-        // Verify both were registered in the order they were added
-        verifySequence {
-            monitor1.register(testModule)
-            monitor2.register(testModule)
-        }
+        val monitors = scope.getMonitors()
+        assertEquals(2, monitors.size)
+        assertEquals(monitor1, monitors[0])
+        assertEquals(monitor2, monitors[1])
     }
 
     @Test
     fun `plus operator adds ReactionHandle to pending list`() {
-        val testModule = createTestModule()
-        val scope = DefaultModuleScope(testModule)
+        val scope = DefaultModuleScope()
         val reaction1 = mockk<ReactionHandle<Unit>>(relaxed = true)
         val reaction2 = mockk<ReactionHandle<Unit>>(relaxed = true)
 
@@ -66,19 +46,16 @@ class DefaultModuleScopeTest {
             +reaction1
             +reaction2
         }
-        scope.activate()
 
-        // Verify both were registered in the order they were added
-        verifySequence {
-            reaction1.register(testModule)
-            reaction2.register(testModule)
-        }
+        val reactions = scope.getReactions()
+        assertEquals(2, reactions.size)
+        assertEquals(reaction1, reactions[0])
+        assertEquals(reaction2, reactions[1])
     }
 
     @Test
     fun `plus operator adds ActionHandle to pending list`() {
-        val testModule = createTestModule()
-        val scope = DefaultModuleScope(testModule)
+        val scope = DefaultModuleScope()
         val action1 = mockk<ActionHandle<*>>(relaxed = true)
         val action2 = mockk<ActionHandle<*>>(relaxed = true)
 
@@ -86,19 +63,16 @@ class DefaultModuleScopeTest {
             +action1
             +action2
         }
-        scope.activate()
 
-        // Verify both were registered in the order they were added
-        verifySequence {
-            action1.register(testModule)
-            action2.register(testModule)
-        }
+        val actions = scope.getActions()
+        assertEquals(2, actions.size)
+        assertEquals(action1, actions[0])
+        assertEquals(action2, actions[1])
     }
 
     @Test
-    fun `activate registers all pending primitives in the correct order`() {
-        val testModule = createTestModule()
-        val scope = DefaultModuleScope(testModule)
+    fun `mixed primitives are stored in type-specific collections`() {
+        val scope = DefaultModuleScope()
 
         // Create mocks for each type
         val monitor = mockk<MonitorHandle>(relaxed = true)
@@ -112,30 +86,24 @@ class DefaultModuleScopeTest {
             +reaction
         }
 
-        // Activate should register them by type (monitors, reactions, actions)
-        scope.activate()
-
-        // Verify registration order by type
-        verifySequence {
-            monitor.register(testModule)
-            reaction.register(testModule)
-            action.register(testModule)
-        }
+        // Verify each is in its own collection
+        assertEquals(listOf(monitor), scope.getMonitors())
+        assertEquals(listOf(reaction), scope.getReactions())
+        assertEquals(listOf(action), scope.getActions())
     }
 
     @Test
-    fun `activate works with empty lists`() {
-        val testModule = createTestModule()
-        val scope = DefaultModuleScope(testModule)
+    fun `get methods work with empty collections`() {
+        val scope = DefaultModuleScope()
 
-        // Should not throw any exceptions
-        scope.activate()
+        assertTrue(scope.getMonitors().isEmpty())
+        assertTrue(scope.getReactions().isEmpty())
+        assertTrue(scope.getActions().isEmpty())
     }
 
     @Test
     fun `plus supports multiple primitives of the same type`() {
-        val testModule = createTestModule()
-        val scope = DefaultModuleScope(testModule)
+        val scope = DefaultModuleScope()
 
         // Create multiple primitives of each type
         val monitors = List(3) { mockk<MonitorHandle>(relaxed = true) }
@@ -149,33 +117,49 @@ class DefaultModuleScopeTest {
             actions.forEach { +it }
         }
 
-        // Activate
-        scope.activate()
-
-        // Verify all were registered in the expected type order
-        verifySequence {
-            monitors.forEach { it.register(testModule) }
-            reactions.forEach { it.register(testModule) }
-            actions.forEach { it.register(testModule) }
-        }
+        // Verify all were stored in their respective collections
+        assertEquals(monitors, scope.getMonitors())
+        assertEquals(reactions, scope.getReactions())
+        assertEquals(actions, scope.getActions())
     }
 
     @Test
-    fun `multiple activate calls register primitives only once`() {
-        val testModule = createTestModule()
-        val scope = DefaultModuleScope(testModule)
+    fun `adding the same primitive multiple times adds multiple instances`() {
+        val scope = DefaultModuleScope()
         val monitor = mockk<MonitorHandle>(relaxed = true)
 
         with(scope) {
             +monitor
+            +monitor
+            +monitor
         }
 
-        // Call activate multiple times
-        scope.activate()
-        scope.activate()
-        scope.activate()
+        val monitors = scope.getMonitors()
+        assertEquals(3, monitors.size)
+        assertEquals(monitor, monitors[0])
+        assertEquals(monitor, monitors[1])
+        assertEquals(monitor, monitors[2])
+    }
 
-        // Verify registration was only called once
-        verify(exactly = 1) { monitor.register(testModule) }
+    @Test
+    fun `collections are not shared between scope instances`() {
+        val scope1 = DefaultModuleScope()
+        val scope2 = DefaultModuleScope()
+
+        val monitor1 = mockk<MonitorHandle>(relaxed = true)
+        val monitor2 = mockk<MonitorHandle>(relaxed = true)
+
+        with(scope1) { +monitor1 }
+        with(scope2) { +monitor2 }
+
+        // Verify scope1 only has monitor1
+        assertEquals(listOf(monitor1), scope1.getMonitors())
+        assertTrue(scope1.getReactions().isEmpty())
+        assertTrue(scope1.getActions().isEmpty())
+
+        // Verify scope2 only has monitor2
+        assertEquals(listOf(monitor2), scope2.getMonitors())
+        assertTrue(scope2.getReactions().isEmpty())
+        assertTrue(scope2.getActions().isEmpty())
     }
 }

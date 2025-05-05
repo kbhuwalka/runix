@@ -28,13 +28,14 @@ class BooleanConditionTypeTest {
 
     @BeforeTest
     fun setup() {
-        RuntimeScope.overrideScopeForTesting(CoroutineScope(dispatcher))
+        RuntimeScope.install(CoroutineScope(dispatcher))
         Time.setProvider(provider)
     }
 
     @AfterTest
     fun tearDown() {
         Time.resetToRealTime()
+        RuntimeScope.clear()
     }
 
     private val flow = MutableStateFlow(false)

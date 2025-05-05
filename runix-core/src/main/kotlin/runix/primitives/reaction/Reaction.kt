@@ -1,3 +1,5 @@
+package runix.primitives.reaction
+
 import runix.primitives.reaction.ReactionHandle
 import runix.primitives.signal.SignalHandle
 

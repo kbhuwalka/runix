@@ -1,7 +1,10 @@
 package runix.temporal.trackers
 
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.TestScope
+import runix.runtime.internal.RuntimeScope
 import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
@@ -11,8 +14,13 @@ class TrackerRegistryTest {
 
     enum class DummyState { A, B }
 
+    @BeforeTest
+    fun setup() {
+        RuntimeScope.install(TestScope())
+    }
     @AfterTest
     fun cleanup() {
+        RuntimeScope.clear()
         TrackerRegistry.unregister("bool")
         TrackerRegistry.unregister("num")
         TrackerRegistry.unregister("cat")

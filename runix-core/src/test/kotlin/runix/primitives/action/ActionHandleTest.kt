@@ -13,6 +13,9 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import runix.primitives.module.AppModule
+import runix.runtime.internal.RuntimeScope
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -22,6 +25,16 @@ import kotlin.time.Duration.Companion.seconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class ActionHandleTest {
     private val testScope = TestScope()
+
+    @BeforeTest
+    fun setup() {
+        RuntimeScope.install(testScope)
+    }
+
+    @AfterTest
+    fun tearDown() {
+        RuntimeScope.clear()
+    }
 
     private fun createTestModule(name: String = "TestModule") = mockk<AppModule> {
         every { this@mockk.name } returns name
