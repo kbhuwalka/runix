@@ -1,8 +1,5 @@
 package runix.runtime
 
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
-import runix.runtime.internal.RuntimeScope
 import runix.primitives.module.AppModule
 
 /**
@@ -32,9 +29,10 @@ import runix.primitives.module.AppModule
  * ```
  */
 abstract class App : Activatable {
-    private val modules = mutableListOf<AppModule>()
+    protected val modules = mutableListOf<AppModule>()
     private var didStartBlock: (suspend () -> Unit)? = null
     private var willStopBlock: (suspend () -> Unit)? = null
+    private var isRunning = false
     
     /**
      * Installs a module into this app.
@@ -65,30 +63,33 @@ abstract class App : Activatable {
      * Start the application: install components, activate all modules,
      * and run the didStart hook.
      */
-    override fun activate() {
-        // Activate all modules
-        modules.forEach { it.activate() }
-        
-        // Execute developer hook
-        RuntimeScope.scope.launch {
-            didStartBlock?.invoke()
-        }
+    override suspend fun activate() {
+        if (isRunning) return
+        activateModules()
+        didStartBlock?.invoke()
+        isRunning = true
     }
-    
+
+    /**
+     * Protected method to allow test subclasses to override activation without
+     * dealing with async/await complexities
+     */
+    protected open suspend fun activateModules() {
+        modules.forEach { it.activate() }
+    }
+
+
     /**
      * Gracefully shutdown the application: run the willStop hook,
      * deactivate all modules in reverse order.
      */
-    override fun deactivate() {
+    override suspend fun deactivate() {
+        if (!isRunning) return
         // Execute developer hook first
-        RuntimeScope.scope.launch {
-            willStopBlock?.invoke()
-        }
+        willStopBlock?.invoke()
         
         // Then deactivate all modules in reverse order
         modules.asReversed().forEach { it.deactivate() }
-        
-        // Finally cancel the runtime scope
-        RuntimeScope.scope.cancel("App shutdown")
+        isRunning = false
     }
 }

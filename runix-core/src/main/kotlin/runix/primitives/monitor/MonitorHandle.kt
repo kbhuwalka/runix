@@ -50,7 +50,7 @@ class MonitorHandle internal constructor(
     /**
      * Activates this monitor, making it start evaluating its condition.
      */
-    override fun activate() {
+    override suspend fun activate() {
         check(guard.isRegistered()) { "Monitor '$name' must be registered before activating." }
         if (started.get()) return
         started.set(true)
@@ -63,7 +63,7 @@ class MonitorHandle internal constructor(
     /**
      * Deactivates this monitor, stopping condition evaluation.
      */
-    override fun deactivate() {
+    override suspend fun deactivate() {
         if (!started.get()) return
         compiled.stop()
         RuntimeScheduler.cancelRecheck(this)

@@ -16,11 +16,11 @@ internal interface Activatable {
      * - AppModule: Activates all primitives and runs didActivate hook
      * - Primitives: Starts monitoring or subscribes to signals
      */
-    fun activate()
+    suspend fun activate()
 
     /**
      * Deactivates this component in preparation for shutdown.
      * Components should clean up resources and stop ongoing work.
      */
-    fun deactivate()
+    suspend fun deactivate()
 }

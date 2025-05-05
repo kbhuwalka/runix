@@ -1,12 +1,17 @@
 package runix.runtime
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import runix.runtime.internal.RuntimeScope
 import kotlin.reflect.KClass
 
 /**
- * Central runtime manager for the entire Runix app.
+ * Central runtime manager for the entire app.
  * Entry point for launching apps programmatically.
  */
-object AppRuntime {
+internal object AppRuntime {
     private var isRunning = false
     private var runningApp: App? = null
 
@@ -14,8 +19,12 @@ object AppRuntime {
      * Starts an application and all its modules.
      * This is the main entry point for programmatic app launch.
      */
-    fun start(app: App) {
+    suspend fun start(app: App) {
         check(!isRunning) { "AppRuntime is already running." }
+
+        // Create and install the RuntimeScope
+        val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        RuntimeScope.install(appScope)
 
         // Initialize runtime scheduler
         RuntimeScheduler.start()
@@ -31,40 +40,32 @@ object AppRuntime {
     /**
      * Stops an application and all its modules.
      */
-    fun stop(app: App) {
+    suspend fun stop() {
         if (!isRunning) return
 
         try {
             // Gracefully deactivate the app
-            app.deactivate()
+            runningApp?.deactivate()
         } finally {
             // Ensure scheduler is stopped even if deactivation has errors
             RuntimeScheduler.stop()
+            shutDownRuntimeScope()
+
             runningApp = null
             isRunning = false
         }
     }
-    
-    /**
-     * Stops the currently running app if any.
-     * Used by shutdown hooks when the app reference isn't directly available.
-     */
-    fun stopRunningApp() {
-        runningApp?.let { stop(it) }
-    }
 
-    /**
-     * Discovers and starts the first available App in the classpath.
-     * Used for automatic startup without developers needing to write main().
-     */
-    fun discoverAndStart() {
-        val appClass = App::class.sealedSubclasses.firstOrNull()
-            ?: App::class.nestedClasses.filterIsInstance<KClass<App>>().firstOrNull()
-            ?: throw IllegalStateException("No App implementation found")
-
-        val app = appClass.objectInstance
-            ?: throw IllegalStateException("App must be an object")
-
-        start(app)
+    private fun shutDownRuntimeScope() {
+        try {
+            // Explicitly cancel any remaining coroutines in the scope
+            RuntimeScope.scope.cancel("AppRuntime shutdown")
+        } catch (e: Exception) {
+            // Log but don't rethrow to ensure cleanup continues
+            System.err.println("Error canceling RuntimeScope: ${e.message}")
+        } finally {
+            // Clear the RuntimeScope reference
+            RuntimeScope.clear()
+        }
     }
 }

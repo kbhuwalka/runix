@@ -1,6 +1,5 @@
 package runix.primitives.reaction
 
-import reaction
 import runix.runtime.Activatable
 import runix.primitives.module.AppModule
 import runix.primitives.signal.SignalHandle
@@ -16,7 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class ReactionHandle<T> internal constructor(
     val name: String,
     private val signal: SignalHandle<T>,
-    private val handler: suspend (T) -> Unit
+    internal val handler: suspend (T) -> Unit
 ) : Registerable, Activatable {
     private val guard = RegistrationGuard()
     private var activated = AtomicBoolean(false)
@@ -32,21 +31,21 @@ class ReactionHandle<T> internal constructor(
     /**
      * Activates this reaction by registering its handler with the SignalBus.
      */
-    override fun activate() {
+    override suspend fun activate() {
         check(guard.isRegistered()) { "Reaction '$name' must be registered before activation." }
         if (activated.get()) return
         
-        SignalBus.register(signal, handler)
+        SignalBus.register(signal, this)
         activated.set(true)
     }
     
     /**
      * Deactivates this reaction by unregistering its handler from the SignalBus.
      */
-    override fun deactivate() {
+    override suspend fun deactivate() {
         if (!activated.get()) return
         
-        SignalBus.unregister(signal, handler)
+        SignalBus.unregister(signal, this)
         activated.set(false)
     }
 

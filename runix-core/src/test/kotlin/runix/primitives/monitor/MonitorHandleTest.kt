@@ -113,7 +113,7 @@ class MonitorHandleTest {
     }
 
     @Test
-    fun `monitor start requires registration`() {
+    fun `monitor start requires registration`() = runTest {
         val testCondition = TestCondition()
         val monitor = MonitorHandle("unregistered", testCondition, null)
 
@@ -197,7 +197,7 @@ class MonitorHandleTest {
     }
 
     @Test
-    fun `monitor can safely stop without starting`() {
+    fun `monitor can safely stop without starting`() = runTest {
         val testCondition = TestCondition()
         val monitor = MonitorHandle("untouched", testCondition, null)
 

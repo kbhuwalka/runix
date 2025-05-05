@@ -1,10 +1,13 @@
 package runix.primitives.module
 
-import runix.runtime.Activatable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import runix.primitives.action.ActionHandle
 import runix.primitives.monitor.MonitorHandle
 import runix.primitives.reaction.ReactionHandle
+import runix.runtime.Activatable
 import runix.runtime.App
 import runix.runtime.DefaultModuleScope
 import runix.runtime.ModuleScope
@@ -31,19 +34,22 @@ import runix.runtime.internal.RuntimeScope
  *     batteryLevel < 20.0
  *   } emit batteryLowSignal
  * 
- *   // Register behavior directly in class body
- *   defineBehavior {
- *     +batteryLow
- *     +powerOffReaction
- *   }
- * 
- *   // Set lifecycle hooks directly
- *   didStart { 
- *     logger.info("Power module active")
- *   }
+ *   // Configure the module in the init block
+ *   init {
+ *     // Register behavior
+ *     defineBehavior {
+ *       +batteryLow
+ *       +powerOffReaction
+ *     }
  *   
- *   willStop {
- *     logger.info("Power module shutting down")
+ *     // Set lifecycle hooks
+ *     didStart { 
+ *       logger.info("Power module active")
+ *     }
+ *     
+ *     willStop {
+ *       logger.info("Power module shutting down")
+ *     }
  *   }
  * }
  * ```
@@ -65,7 +71,7 @@ abstract class AppModule(
     
     /**
      * Defines behavior for this module by registering primitives.
-     * Can be called directly in the module's class body.
+     * Should be called from the module's init block.
      */
     fun defineBehavior(block: ModuleScope.() -> Unit) {
         BehaviorRegistry.claim(this)
@@ -86,7 +92,7 @@ abstract class AppModule(
     
     /**
      * Register a callback to be invoked after all primitives are activated.
-     * Can be called directly in the module's class body.
+     * Should be called from the module's init block.
      */
     fun didStart(block: suspend () -> Unit) {
         didStartBlock = block
@@ -94,7 +100,7 @@ abstract class AppModule(
     
     /**
      * Register a callback to be invoked before primitives are deactivated.
-     * Can be called directly in the module's class body.
+     * Should be called from the module's init block.
      */
     fun willStop(block: suspend () -> Unit) {
         willStopBlock = block
@@ -111,26 +117,19 @@ abstract class AppModule(
      * Activates all primitives in this module.
      * Called internally by the runtime - do not call directly.
      */
-    override fun activate() {
-        // Start all primitives
-        monitors.forEach { it.activate() }
+    override suspend fun activate() {
         reactions.forEach { it.activate() }
-        
-        // Execute developer hook
-        RuntimeScope.scope.launch {
-            didStartBlock?.invoke()
-        }
+        monitors.forEach { it.activate() }
+        didStartBlock?.invoke()
     }
     
     /**
      * Deactivates all primitives in this module.
      * Called internally by the runtime - do not call directly.
      */
-    override fun deactivate() {
-        // Execute developer hook first
-        RuntimeScope.scope.launch {
-            willStopBlock?.invoke()
-        }
+    override suspend fun deactivate() {
+        // Execute developer hook first - BLOCKING to ensure completion
+        willStopBlock?.invoke()
         
         // Then stop all primitives in reverse order
         reactions.asReversed().forEach { it.deactivate() }
