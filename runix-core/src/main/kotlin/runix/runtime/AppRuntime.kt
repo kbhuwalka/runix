@@ -5,21 +5,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import runix.runtime.internal.RuntimeScope
-import kotlin.reflect.KClass
 
 /**
- * Central runtime manager for the entire app.
- * Entry point for launching apps programmatically.
+ * Central runtime manager for the runtime environment.
+ * Handles low-level runtime initialization and cleanup.
  */
 internal object AppRuntime {
     private var isRunning = false
-    private var runningApp: App? = null
 
     /**
-     * Starts an application and all its modules.
-     * This is the main entry point for programmatic app launch.
+     * Initializes the runtime environment.
+     * This sets up the coroutine scope and starts the scheduler.
      */
-    suspend fun start(app: App) {
+    suspend fun initialize() {
         check(!isRunning) { "AppRuntime is already running." }
 
         // Create and install the RuntimeScope
@@ -28,30 +26,24 @@ internal object AppRuntime {
 
         // Initialize runtime scheduler
         RuntimeScheduler.start()
-
-        // Activate the app
-        app.activate()
         
-        // Store reference for shutdown
-        runningApp = app
         isRunning = true
     }
 
     /**
-     * Stops an application and all its modules.
+     * Shuts down the runtime environment.
+     * This stops the scheduler and cancels any ongoing coroutines.
      */
-    suspend fun stop() {
+    fun shutdown() {
         if (!isRunning) return
 
         try {
-            // Gracefully deactivate the app
-            runningApp?.deactivate()
-        } finally {
-            // Ensure scheduler is stopped even if deactivation has errors
+            // Ensure scheduler is stopped
             RuntimeScheduler.stop()
-            shutDownRuntimeScope()
+        } catch (_: Exception) {
 
-            runningApp = null
+        } finally {
+            shutDownRuntimeScope()
             isRunning = false
         }
     }
