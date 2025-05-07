@@ -14,6 +14,9 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import runix.RuntimeScopeTestHelper
 import runix.primitives.module.AppModule
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -26,18 +29,23 @@ class AppTest {
     private val testDispatcher = StandardTestDispatcher()
     private val testScope = TestScope(testDispatcher)
     private val runtimeHelper = RuntimeScopeTestHelper(testScope)
-
+    
     @BeforeEach
     fun setUp() {
         runtimeHelper.setup()
+
+        mockkObject(AppRuntime)
+        coJustRun { AppRuntime.initialize() }
+        justRun { AppRuntime.shutdown() }
     }
 
     @AfterEach
     fun tearDown() {
         runtimeHelper.tearDown()
+        unmockkAll()
     }
 
-    // Helper functions to create test components
+    // Helper function to create a mock module
     private fun createMockModule(
         name: String = "TestModule",
         failOnActivate: Boolean = false
@@ -60,172 +68,326 @@ class AppTest {
         @Test
         @DisplayName("should add module to app and set app reference")
         fun addModuleAndSetAppReference() {
-            // Arrange
-            val app = App()
+            val app = TestApp()
             val module = createMockModule()
 
-            // Act
             app.install(module)
 
-            // Assert
             verify { module.setApp(app) }
             assertTrue(app.testModules.contains(module))
         }
     }
 
     @Nested
-    @DisplayName("Lifecycle management")
-    inner class LifecycleManagement {
+    @DisplayName("Synchronous start and stop")
+    inner class SyncStartStop {
 
-        @Nested
-        @DisplayName("Activation")
-        inner class Activation {
-
-            @Test
-            @DisplayName("should activate all modules and call didStart")
-            fun activatesModulesAndCallsDidStart() = runTest {
-                // Arrange
-                val app = App()
-                var didStartCalled = false
-                
-                // Create and install mock modules
-                val modules = List(3) { index ->
-                    createMockModule("Module$index")
-                }
-                modules.forEach { app.install(it) }
-                
-                app.didStart { didStartCalled = true }
-
-                // Act
-                app.activate()
-                advanceUntilIdle()
-
-                // Assert - verify all modules were activated
-                modules.forEach { coVerify { it.activate() } }
-                
-                // Verify didStart was called
-                assertTrue(didStartCalled, "didStart callback should be called")
+        @Test
+        @DisplayName("start() should set up JVM shutdown hook, start app, and block until signaled")
+        fun startSetsUpHookAndBlocks() {
+            // Arrange
+            val app = spyk(TestApp())
+            coJustRun { app.startAsync() }
+            coJustRun { app.stopAsync() }
+            
+            // Mock Runtime for shutdown hook verification
+            val runtime = mockk<Runtime>()
+            mockkStatic(Runtime::class)
+            every { Runtime.getRuntime() } returns runtime
+            justRun { runtime.addShutdownHook(any()) }
+            
+            // Set up a separate thread to call stop() after a delay
+            val completionLatch = CountDownLatch(1)
+            thread {
+                // Give time for start() to begin blocking
+                Thread.sleep(100)
+                app.stop()
+                completionLatch.countDown()
             }
-
-            @Test
-            @DisplayName("should be idempotent")
-            fun activationIsIdempotent() = runTest {
-                // Arrange
-                val app = App()
-                val module = createMockModule()
-                app.install(module)
-
-                // Act - call activate twice
-                app.activate()
-                advanceUntilIdle()
-                app.activate() // Second call should be a no-op
-                advanceUntilIdle()
-
-                // Assert - module's activate should only be called once
-                coVerify(exactly = 1) { module.activate() }
+            
+            // Act
+            app.start()
+            
+            // Assert
+            verify {
+                runtime.addShutdownHook(any())
             }
+            coVerify { 
+                app.startAsync()
+                app.stopAsync()
+            }
+            
+            // Verify our test completed (meaning start() unblocked)
+            assertTrue(completionLatch.await(1, TimeUnit.SECONDS), "Test did not complete in time")
+        }
+        
+        @Test
+        @DisplayName("stop() should signal shutdown and call stopAsync")
+        fun stopSignalsShutdownAndCallsStopAsync() {
+            // Arrange
+            val app = spyk(TestApp())
+            coJustRun { app.stopAsync() }
+            
+            // Act
+            app.stop()
+            
+            // Assert
+            coVerify { app.stopAsync() }
+            assertEquals(0, app.testShutdownLatch.count, "Shutdown latch should be counted down")
+        }
+        
+        @Test
+        @DisplayName("setupShutdownHook should register a thread that counts down the latch")
+        fun setupShutdownHookRegistersThread() {
+            // Arrange
+            val app = TestApp()
+            val runtime = mockk<Runtime>()
+            mockkStatic(Runtime::class)
+            every { Runtime.getRuntime() } returns runtime
+            
+            val threadSlot = slot<Thread>()
+            justRun { runtime.addShutdownHook(capture(threadSlot)) }
+            
+            // Act
+            app.testSetupShutdownHook()
+            
+            // Assert
+            verify { runtime.addShutdownHook(any()) }
+            
+            // Execute the captured shutdown thread to verify it counts down the latch
+            assertEquals(1, app.testShutdownLatch.count, "Latch should start at 1")
+            threadSlot.captured.run()
+            assertEquals(0, app.testShutdownLatch.count, "Latch should be counted down by hook")
+        }
+    }
 
-            @Test
-            @DisplayName("should propagate module activation errors")
-            fun propagatesModuleActivationErrors() = runTest {
-                // Arrange
-                val app = App()
-                val goodModule = createMockModule("GoodModule")
-                val errorModule = createMockModule("ErrorModule", failOnActivate = true)
-                
-                app.install(goodModule)
-                app.install(errorModule)
-                
-                var didStartCalled = false
-                app.didStart { didStartCalled = true }
+    @Nested
+    @DisplayName("App startup and shutdown")
+    inner class AppStartupAndShutdown {
+        
+        @Test
+        @DisplayName("startAsync should initialize runtime and activate app")
+        fun startAsyncInitializesRuntimeAndActivatesApp() = runTest {
+            val app = spyk(TestApp())
+            coJustRun { app.activate() }
 
-                // Act & Assert - activation should fail
-                assertThrows<RuntimeException> {
-                    app.activate()
-                    advanceUntilIdle()
-                }
-                
-                // didStart shouldn't be called due to activation failure
-                assertFalse(didStartCalled, "didStart shouldn't be called if activation fails")
+            app.startAsync()
+            advanceUntilIdle()
+
+            coVerifyOrder {
+                AppRuntime.initialize()
+                app.activate()
             }
         }
+        
+        @Test
+        @DisplayName("startAsync should throw if app is already running")
+        fun startAsyncThrowsIfAlreadyRunning() = runTest {
+            val app = spyk(TestApp())
+            coJustRun { app.activate() }
 
-        @Nested
-        @DisplayName("Deactivation")
-        inner class Deactivation {
+            app.startAsync()
+            advanceUntilIdle()
 
-            @Test
-            @DisplayName("should call willStop and deactivate modules in reverse order")
-            fun callsWillStopAndDeactivatesInReverseOrder() = runTest {
-                // Arrange
-                val app = App()
-                var willStopCalled = false
-                val deactivationOrder = mutableListOf<String>()
-                
-                // Create mock modules that track deactivation order
-                val modules = List(3) { index ->
-                    mockk<AppModule>(relaxed = true) {
-                        every { name } returns "Module$index"
-                        coJustRun { activate() }
-                        coEvery { deactivate() } coAnswers {
-                            deactivationOrder.add("Module$index")
-                        }
+            assertThrows<IllegalStateException> {
+                runTest {
+                    app.startAsync()
+                }
+            }
+        }
+        
+        @Test
+        @DisplayName("stopAsync should deactivate app and shutdown runtime")
+        fun stopAsyncDeactivatesAppAndShutdownsRuntime() = runTest {
+            val app = TestApp()
+
+            app.startAsync()
+            advanceUntilIdle()
+
+            app.stopAsync()
+            advanceUntilIdle()
+
+            coVerifyOrder {
+                app.deactivate()
+                AppRuntime.shutdown()
+            }
+        }
+        
+        @Test
+        @DisplayName("stopAsync should shut down runtime even if deactivation fails")
+        fun stopAsyncShutdownsRuntimeEvenIfDeactivationFails() = runTest {
+            val app = TestApp()
+            
+            app.startAsync()
+            advanceUntilIdle()
+            
+            app.stopAsync()
+            advanceUntilIdle()
+            
+            verify { AppRuntime.shutdown() }
+        }
+        
+        @Test
+        @DisplayName("stopAsync should do nothing if app is not running")
+        fun stopAsyncDoesNothingIfNotRunning() = runTest {
+            // Arrange
+            val app = spyk(TestApp())
+            
+            // Act
+            app.stopAsync()
+            advanceUntilIdle()
+            
+            // Assert
+            coVerify(exactly = 0) { app.deactivate() }
+            verify(exactly = 0) { AppRuntime.shutdown() }
+        }
+    }
+
+    @Nested
+    @DisplayName("App activation")
+    inner class AppActivation {
+
+        @Test
+        @DisplayName("should activate all modules in order and call didStart")
+        fun activatesModulesInOrderAndCallsDidStart() = runTest {
+            // Arrange
+            val app = TestApp()
+            var didStartCalled = false
+            
+            // Create modules with tracked activation order
+            val activationOrder = mutableListOf<String>()
+            val modules = List(3) { index ->
+                mockk<AppModule>(relaxed = true) {
+                    every { name } returns "Module$index"
+                    coEvery { activate() } coAnswers {
+                        activationOrder.add("Module$index")
                     }
                 }
-                
-                // Install modules and set lifecycle callback
-                modules.forEach { app.install(it) }
-                app.willStop { willStopCalled = true }
-                
-                // First activate
+            }
+            
+            modules.forEach { app.install(it) }
+            app.didStart { didStartCalled = true }
+
+            app.activate()
+            advanceUntilIdle()
+
+            assertTrue(didStartCalled, "didStart callback should be called")
+            assertEquals(
+                listOf("Module0", "Module1", "Module2"),
+                activationOrder,
+                "Modules should be activated in installation order"
+            )
+        }
+
+        @Test
+        @DisplayName("should be idempotent")
+        fun activationIsIdempotent() = runTest {
+            val app = TestApp()
+            val module = createMockModule()
+            app.install(module)
+
+            app.activate()
+            advanceUntilIdle()
+            app.activate() // The second call should be a no-op
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { module.activate() }
+        }
+
+        @Test
+        @DisplayName("should propagate module activation errors")
+        fun propagatesModuleActivationErrors() = runTest {
+            val app = TestApp()
+            val goodModule = createMockModule("GoodModule")
+            val errorModule = createMockModule("ErrorModule", failOnActivate = true)
+            
+            app.install(goodModule)
+            app.install(errorModule)
+            
+            var didStartCalled = false
+            app.didStart { didStartCalled = true }
+
+            assertThrows<RuntimeException> {
                 app.activate()
                 advanceUntilIdle()
-                
-                // Act - deactivate
-                app.deactivate()
-                advanceUntilIdle()
-                
-                // Assert
-                assertTrue(willStopCalled, "willStop callback should be called")
-                
-                // Verify deactivation order (reverse of installation)
-                assertEquals(
-                    listOf("Module2", "Module1", "Module0"),
-                    deactivationOrder,
-                    "Modules should be deactivated in reverse order"
-                )
             }
 
-            @Test
-            @DisplayName("should be idempotent")
-            fun deactivationIsIdempotent() = runTest {
-                // Arrange
-                val app = App()
-                val module = createMockModule()
-                app.install(module)
-                
-                // First activate
-                app.activate()
-                advanceUntilIdle()
-                
-                // Act - call deactivate twice
-                app.deactivate()
-                advanceUntilIdle()
-                app.deactivate() // Second call should be a no-op
-                advanceUntilIdle()
-                
-                // Assert - module's deactivate should only be called once
-                coVerify(exactly = 1) { module.deactivate() }
+            assertFalse(didStartCalled, "didStart shouldn't be called if activation fails")
+        }
+    }
+
+    @Nested
+    @DisplayName("App deactivation")
+    inner class AppDeactivation {
+
+        @Test
+        @DisplayName("should call willStop and deactivate modules in reverse order")
+        fun callsWillStopAndDeactivatesInReverseOrder() = runTest {
+            val app = TestApp()
+            var willStopCalled = false
+            val deactivationOrder = mutableListOf<String>()
+            
+            // Create modules tracking deactivation order
+            val modules = List(3) { index ->
+                mockk<AppModule>(relaxed = true) {
+                    every { name } returns "Module$index"
+                    coJustRun { activate() }
+                    coEvery { deactivate() } coAnswers {
+                        deactivationOrder.add("Module$index")
+                    }
+                }
             }
+            
+            modules.forEach { app.install(it) }
+            app.willStop { willStopCalled = true }
+
+            app.activate()
+            advanceUntilIdle()
+
+            app.deactivate()
+            advanceUntilIdle()
+
+            assertTrue(willStopCalled, "willStop callback should be called")
+            assertEquals(
+                listOf("Module2", "Module1", "Module0"),
+                deactivationOrder,
+                "Modules should be deactivated in reverse order"
+            )
+        }
+
+        @Test
+        @DisplayName("should be idempotent")
+        fun deactivationIsIdempotent() = runTest {
+            val app = TestApp()
+            val module = createMockModule()
+            app.install(module)
+
+            app.activate()
+            advanceUntilIdle()
+
+            app.deactivate()
+            advanceUntilIdle()
+            app.deactivate() // The second call should be a no-op
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { module.deactivate() }
         }
     }
 
     /**
-     * Concrete implementation for testing purposes
+     * Test implementation that exposes protected/private members for verification
      */
-    private class App : runix.runtime.App() {
-        // Expose modules for testing
+    private class TestApp : App() {
         val testModules: List<AppModule>
             get() = this.modules.toList()
+            
+        // Expose shutdown latch for testing
+        val testShutdownLatch: CountDownLatch
+            get() = shutdownLatch
+            
+        // Expose private method for testing
+        fun testSetupShutdownHook() {
+            setupShutdownHook()
+        }
     }
 }

@@ -12,7 +12,6 @@ import io.mockk.verify
 import io.mockk.verifyOrder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -50,73 +49,52 @@ class AppRuntimeTest {
     @AfterEach
     fun tearDown() {
         unmockkAll()
-        runBlocking { AppRuntime.stop() }
-    }
-
-    // Helper function to create mock app
-    private fun createMockApp(throwOnDeactivate: Boolean = false): App {
-        return mockk<App>(relaxed = true) {
-            coJustRun { activate() }
-            if (throwOnDeactivate) {
-                coEvery { deactivate() } throws RuntimeException("Deactivation failed")
-            } else {
-                coJustRun { deactivate() }
-            }
-        }
+        AppRuntime.shutdown()
     }
 
     @Nested
-    @DisplayName("Starting an app")
-    inner class StartApp {
+    @DisplayName("Runtime initialization")
+    inner class RuntimeInitialization {
 
         @Test
-        @DisplayName("should initialize runtime components and activate app")
-        fun initializeRuntimeAndActivateApp() = runTest {
-            val app = createMockApp()
-
-            AppRuntime.start(app)
+        @DisplayName("should initialize runtime components correctly")
+        fun initializeRuntimeCorrectly() = runTest {
+            AppRuntime.initialize()
             advanceUntilIdle()
 
             verifyOrder {
                 RuntimeScope.install(any<CoroutineScope>())
                 RuntimeScheduler.start()
             }
-            coVerify { app.activate() }
         }
 
         @Test
-        @DisplayName("should reject starting when already running")
-        fun rejectsStartingWhenAlreadyRunning() = runTest {
-            val firstApp = createMockApp()
-            AppRuntime.start(firstApp)
+        @DisplayName("should reject initialization when already running")
+        fun rejectsInitializationWhenAlreadyRunning() = runTest {
+            AppRuntime.initialize()
             advanceUntilIdle()
 
-            val secondApp = createMockApp()
             assertThrows<IllegalStateException> {
-                runBlocking {
-                    AppRuntime.start(secondApp)
+                runTest {
+                    AppRuntime.initialize()
                 }
             }
-            advanceUntilIdle()
         }
     }
 
     @Nested
-    @DisplayName("Stopping an app")
-    inner class StopApp {
+    @DisplayName("Runtime shutdown")
+    inner class RuntimeShutdown {
 
         @Test
-        @DisplayName("should deactivate app and clean up runtime")
-        fun deactivateAppAndCleanupRuntime() = runTest {
-            val app = createMockApp()
-            AppRuntime.start(app)
+        @DisplayName("should clean up runtime components correctly")
+        fun cleanupRuntimeCorrectly() = runTest {
+            AppRuntime.initialize()
             advanceUntilIdle()
 
-            AppRuntime.stop()
-            advanceUntilIdle()
+            AppRuntime.shutdown()
 
-            coVerify { app.deactivate() }
-            verify { 
+            verify {
                 RuntimeScheduler.stop()
                 RuntimeScope.clear()
             }
@@ -124,73 +102,10 @@ class AppRuntimeTest {
 
         @Test
         @DisplayName("should do nothing if runtime is not running")
-        fun doNothingIfNotRunning() = runTest {
-            val app = createMockApp()
+        fun doNothingIfNotRunning() {
+            AppRuntime.shutdown()
 
-            AppRuntime.stop()
-            advanceUntilIdle()
-
-            coVerify(exactly = 0) { app.deactivate() }
-            verify(exactly = 0) { 
-                RuntimeScheduler.stop()
-                RuntimeScope.clear()
-            }
-        }
-
-        @Test
-        @DisplayName("should clean up runtime even if app deactivation fails")
-        fun cleanupRuntimeEvenIfDeactivationFails() = runTest {
-            val app = createMockApp(throwOnDeactivate = true)
-            AppRuntime.start(app)
-            advanceUntilIdle()
-
-            try {
-                AppRuntime.stop()
-                advanceUntilIdle()
-            } catch (e: RuntimeException) {
-                // Expected exception from app deactivation, continue to verification
-            }
-
-
-
-            // Assert - scheduler and runtime scope should still be cleaned up
-            verify { 
-                RuntimeScheduler.stop()
-                RuntimeScope.clear()
-            }
-        }
-    }
-
-    @Nested
-    @DisplayName("Stopping the running app")
-    inner class StopRunningApp {
-
-        @Test
-        @DisplayName("should stop the currently running app")
-        fun stopsCurrentlyRunningApp() = runTest {
-            val app = createMockApp()
-            AppRuntime.start(app)
-            advanceUntilIdle()
-
-            AppRuntime.stop()
-            advanceUntilIdle()
-
-            coVerify { app.deactivate() }
-            verify { 
-                RuntimeScheduler.stop()
-                RuntimeScope.clear()
-            }
-        }
-
-        @Test
-        @DisplayName("should do nothing if no app is running")
-        fun doNothingIfNoAppRunning() = runTest {
-            // Act - with no app started
-            AppRuntime.stop()
-            advanceUntilIdle()
-
-            // Assert - verify no actions were taken
-            verify(exactly = 0) { 
+            verify(exactly = 0) {
                 RuntimeScheduler.stop()
                 RuntimeScope.clear()
             }
@@ -202,29 +117,56 @@ class AppRuntimeTest {
     inner class RuntimeLifecycle {
 
         @Test
-        @DisplayName("should support multiple start-stop cycles")
-        fun supportsMultipleStartStopCycles() = runTest {
+        @DisplayName("should support multiple initialize-shutdown cycles")
+        fun supportsMultipleInitializeShutdownCycles() = runTest {
             // First cycle
-            val app1 = createMockApp()
-            AppRuntime.start(app1)
+            AppRuntime.initialize()
             advanceUntilIdle()
-            AppRuntime.stop()
-            advanceUntilIdle()
+            AppRuntime.shutdown()
+
+            verify(exactly = 1) {
+                RuntimeScope.install(any<CoroutineScope>())
+                RuntimeScheduler.start()
+                RuntimeScheduler.stop()
+                RuntimeScope.clear()
+            }
+
+            io.mockk.clearMocks(
+                RuntimeScope, 
+                RuntimeScheduler, 
+                recordedCalls = true, 
+                answers = false
+            )
 
             // Second cycle
-            val app2 = createMockApp()
-            AppRuntime.start(app2)
+            AppRuntime.initialize()
             advanceUntilIdle()
-            AppRuntime.stop()
+            AppRuntime.shutdown()
+
+            verify(exactly = 1) {
+                RuntimeScope.install(any<CoroutineScope>())
+                RuntimeScheduler.start()
+                RuntimeScheduler.stop()
+                RuntimeScope.clear()
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Runtime resilience")
+    inner class RuntimeResilience {
+
+        @Test
+        @DisplayName("should clean up runtime even if an exception occurs during shutdown")
+        fun cleanupRuntimeEvenWithException() = runTest {
+            AppRuntime.initialize()
             advanceUntilIdle()
 
-            // Verify both apps were activated and deactivated
-            coVerify { 
-                app1.activate() 
-                app1.deactivate()
-                app2.activate() 
-                app2.deactivate()
-            }
+            every { RuntimeScheduler.stop() } throws RuntimeException("Scheduler stop failed")
+
+            AppRuntime.shutdown()
+
+            verify { RuntimeScope.clear() }
         }
     }
 }
