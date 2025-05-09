@@ -1,8 +1,8 @@
-package runix.runtime.internal
+package runix.primitives.signal
 
 import kotlinx.coroutines.launch
 import runix.primitives.reaction.ReactionHandle
-import runix.primitives.signal.SignalHandle
+import runix.runtime.internal.RuntimeScope
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -31,7 +31,7 @@ internal object SignalBus {
     fun <T> emit(signal: SignalHandle<T>, value: T) {
         // Get all reaction handles registered for this signal
         val reactions = registrations[signal] ?: return
-        
+
         // Launch each reaction handler in the runtime scope with error handling
         reactions.forEach { reaction ->
             RuntimeScope.scope.launch {
@@ -71,7 +71,7 @@ internal object SignalBus {
      */
     fun <T> unregister(signal: SignalHandle<T>, reaction: ReactionHandle<T>) {
         registrations[signal]?.remove(reaction)
-        
+
         // If there are no more reactions for this signal, remove the entry
         if (registrations[signal]?.isEmpty() == true) {
             registrations.remove(signal)

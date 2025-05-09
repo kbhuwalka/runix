@@ -5,7 +5,7 @@ import runix.primitives.module.AppModule
 import runix.primitives.signal.SignalHandle
 import runix.runtime.internal.Registerable
 import runix.runtime.internal.RegistrationGuard
-import runix.runtime.internal.SignalBus
+import runix.primitives.signal.SignalBus
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**

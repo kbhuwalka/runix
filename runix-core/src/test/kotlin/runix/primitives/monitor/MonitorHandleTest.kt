@@ -107,7 +107,7 @@ class MonitorHandleTest {
         val emitted = AtomicBoolean(false)
 
         val signal = mockk<SignalHandle<Unit>>(relaxed = true)
-        every { signal.emit(Unit) } answers { emitted.set(true) }
+        coEvery { signal.emit(Unit) } answers { emitted.set(true) }
 
         val testCondition = TestCondition { ConditionEval.True }
         val monitor = MonitorHandle("test", testCondition, signal)
@@ -121,7 +121,7 @@ class MonitorHandleTest {
         advanceUntilIdle()
 
         assertTrue(emitted.get(), "Signal should have been emitted for ConditionEval.True")
-        verify { signal.emit(Unit) }
+        coVerify { signal.emit(Unit) }
     }
 
     @Test
@@ -139,7 +139,7 @@ class MonitorHandleTest {
         monitor.evaluate()
         advanceUntilIdle()
 
-        verify(exactly = 0) { signal.emit(Unit) }
+        coVerify(exactly = 0) { signal.emit(Unit) }
     }
 
     @Test
@@ -296,20 +296,20 @@ class MonitorHandleTest {
         
         // First evaluation - True
         monitor.evaluate()
-        verify(exactly = 1) { signal.emit(Unit) }
+        coVerify(exactly = 1) { signal.emit(Unit) }
         coVerify(exactly = 1) { dispatcher.cancelScheduled() }
         coVerify(exactly = 0) { dispatcher.scheduleEvaluateAt(any()) }
         
         // Second evaluation - False  
         monitor.evaluate()
-        verify(exactly = 1) { signal.emit(Unit) } // Still only once
+        coVerify(exactly = 1) { signal.emit(Unit) } // Still only once
         coVerify(exactly = 2) { dispatcher.cancelScheduled() }
         coVerify(exactly = 0) { dispatcher.scheduleEvaluateAt(any()) }
         
         // Third evaluation - Delayed
         val delayedResult = evalResults[2] as ConditionEval.Delayed
         monitor.evaluate()
-        verify(exactly = 1) { signal.emit(Unit) } // Still only once
+        coVerify(exactly = 1) { signal.emit(Unit) } // Still only once
         coVerify(exactly = 3) { dispatcher.cancelScheduled() }
         coVerify(exactly = 1) { dispatcher.scheduleEvaluateAt(eq(delayedResult.nextCheckAt)) }
     }

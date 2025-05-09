@@ -1,6 +1,6 @@
 package runix.primitives.signal
 
-import runix.runtime.internal.SignalBus
+import runix.primitives.signal.SignalBus
 
 /**
  * A strongly typed signal used for inter-module communication.
@@ -21,7 +21,7 @@ class SignalHandle<T> internal constructor(
      * Emits a new event of type [T].
      * Reactions or runtime handlers will be invoked accordingly.
      */
-    fun emit(value: T) {
+    suspend fun emit(value: T) {
         SignalBus.emit(this, value)
     }
 

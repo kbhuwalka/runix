@@ -5,12 +5,16 @@ import io.mockk.justRun
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
 import io.mockk.verify
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import runix.runtime.internal.SignalBus
+import runix.primitives.signal.SignalBus
 import kotlin.test.assertEquals
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SignalHandleTest {
 
     @BeforeEach
@@ -41,46 +45,37 @@ class SignalHandleTest {
     }
 
     @Test
-    fun `emit forwards call to SignalBus with correct signal and value`() {
-        // Arrange
+    fun `emit forwards call to SignalBus with correct signal and value`() = runTest {
         val name = "dataAvailable"
         val signalHandle = SignalHandle<String>(name)
         val payload = "Test Data"
         justRun { SignalBus.emit<String>(any(), any()) }
 
-        // Act
         signalHandle.emit(payload)
 
-        // Assert
         verify(exactly = 1) { SignalBus.emit(signalHandle, payload) }
     }
 
     @Test
-    fun `emit with Unit payload forwards to SignalBus`() {
-        // Arrange
+    fun `emit with Unit payload forwards to SignalBus`() = runTest {
         val name = "systemAlert"
         val signalHandle = SignalHandle<Unit>(name)
 
-        // Act
         signalHandle.emit(Unit)
 
-        // Assert
         verify(exactly = 1) { SignalBus.emit(signalHandle, Unit) }
     }
 
     @Test
-    fun `emit with complex data type forwards to SignalBus`() {
-        // Arrange
+    fun `emit with complex data type forwards to SignalBus`() = runTest {
         data class SensorData(val value: Double, val timestamp: Long)
         val name = "sensorReading"
         val signalHandle = SignalHandle<SensorData>(name)
         val payload = SensorData(23.5, System.currentTimeMillis())
         justRun { SignalBus.emit<SensorData>(any(), any()) }
 
-        // Act
         signalHandle.emit(payload)
 
-        // Assert
         verify(exactly = 1) { SignalBus.emit(signalHandle, payload) }
     }
 
@@ -95,7 +90,8 @@ class SignalHandleTest {
         assert(signal1 !== signal2) { "Expected distinct signal instances" }
     }
 
-    @Test fun `signal function creates handle with correct generic type`() {
+    @Test
+    fun `signal function creates handle with correct generic type`() = runTest {
         // This test is more about compile-time type checking
         // We're verifying that the types are preserved through the signal() function
 

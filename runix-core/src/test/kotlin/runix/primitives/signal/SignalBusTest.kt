@@ -1,6 +1,9 @@
-package runix.runtime.internal
+package runix.primitives.signal
 
-import io.mockk.*
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -13,7 +16,6 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import runix.RuntimeScopeTestHelper
 import runix.primitives.reaction.ReactionHandle
-import runix.primitives.signal.SignalHandle
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -30,7 +32,7 @@ class SignalBusTest {
     fun setup() {
         // Setup RuntimeScope mocking with the helper
         runtimeHelper.setup()
-        
+
         // Reset SignalBus state before each test
         SignalBus.reset()
     }
@@ -51,7 +53,7 @@ class SignalBusTest {
             coEvery { this@mockk.handler(any()) } coAnswers { handler(firstArg()) }
         }
     }
-    
+
     // Helper functions to create mocked reaction for Int type
     private fun createIntReaction(
         name: String = "testReaction",
@@ -75,15 +77,15 @@ class SignalBusTest {
             val value = "test value"
             var reaction1Called = false
             var reaction2Called = false
-            
-            val reaction1 = createStringReaction("reaction1") { 
-                if (it == value) reaction1Called = true 
+
+            val reaction1 = createStringReaction("reaction1") {
+                if (it == value) reaction1Called = true
             }
-            
-            val reaction2 = createStringReaction("reaction2") { 
-                if (it == value) reaction2Called = true 
+
+            val reaction2 = createStringReaction("reaction2") {
+                if (it == value) reaction2Called = true
             }
-            
+
             // Register reactions
             SignalBus.register(signal, reaction1)
             SignalBus.register(signal, reaction2)
@@ -98,7 +100,7 @@ class SignalBusTest {
             coVerify(exactly = 1) { reaction1.handler(value) }
             coVerify(exactly = 1) { reaction2.handler(value) }
         }
-        
+
         @Test
         @DisplayName("should not invoke unregistered reactions")
         fun doesNotInvokeUnregisteredReactions() = runTest {
@@ -106,9 +108,9 @@ class SignalBusTest {
             val signal = SignalHandle<String>("testSignal")
             val value = "test value"
             var reactionCalled = false
-            
+
             val reaction = createStringReaction { reactionCalled = true }
-            
+
             // Register and then unregister the reaction
             SignalBus.register(signal, reaction)
             SignalBus.unregister(signal, reaction)
@@ -121,7 +123,7 @@ class SignalBusTest {
             assertFalse(reactionCalled, "Reaction should not be called after unregistration")
             coVerify(exactly = 0) { reaction.handler(any()) }
         }
-        
+
         @Test
         @DisplayName("should continue processing other reactions when one throws an exception")
         fun continuesProcessingAfterException() = runTest {
@@ -130,16 +132,16 @@ class SignalBusTest {
             val value = "test value"
             var errorReactionCalled = false
             var successReactionCalled = false
-            
-            val errorReaction = createStringReaction("errorReaction") { 
+
+            val errorReaction = createStringReaction("errorReaction") {
                 errorReactionCalled = true
-                throw RuntimeException("Test exception") 
+                throw RuntimeException("Test exception")
             }
-            
-            val successReaction = createStringReaction("successReaction") { 
-                successReactionCalled = true 
+
+            val successReaction = createStringReaction("successReaction") {
+                successReactionCalled = true
             }
-            
+
             SignalBus.register(signal, errorReaction)
             SignalBus.register(signal, successReaction)
 
@@ -151,7 +153,7 @@ class SignalBusTest {
             assertTrue(errorReactionCalled, "Error reaction should be called")
             assertTrue(successReactionCalled, "Success reaction should still be called")
         }
-        
+
         @Test
         @DisplayName("should not invoke reactions for unrelated signals")
         fun doesNotInvokeReactionsForUnrelatedSignals() = runTest {
@@ -160,10 +162,10 @@ class SignalBusTest {
             val signal2 = SignalHandle<String>("signal2")
             var reaction1Called = false
             var reaction2Called = false
-            
+
             val reaction1 = createStringReaction { reaction1Called = true }
             val reaction2 = createStringReaction { reaction2Called = true }
-            
+
             SignalBus.register(signal1, reaction1)
             SignalBus.register(signal2, reaction2)
 
@@ -175,20 +177,20 @@ class SignalBusTest {
             assertTrue(reaction1Called, "Reaction1 should be called")
             assertFalse(reaction2Called, "Reaction2 should not be called")
         }
-        
+
         @Test
         @DisplayName("should respect type safety of signals and reactions")
         fun respectsTypeSafety() = runTest {
             // Arrange
             val stringSignal = SignalHandle<String>("stringSignal")
             val intSignal = SignalHandle<Int>("intSignal")
-            
+
             var stringReactionCalled = false
             var intReactionCalled = false
-            
+
             val stringReaction = createStringReaction { stringReactionCalled = true }
             val intReaction = createIntReaction { intReactionCalled = true }
-            
+
             SignalBus.register(stringSignal, stringReaction)
             SignalBus.register(intSignal, intReaction)
 
@@ -212,11 +214,11 @@ class SignalBusTest {
             // Arrange
             val signal = SignalHandle<String>("testSignal")
             var reactionCalled = false
-            
+
             val reaction = createStringReaction { reactionCalled = true }
-            
+
             SignalBus.register(signal, reaction)
-            
+
             // Act
             SignalBus.reset()
             SignalBus.emit(signal, "test")
@@ -226,37 +228,37 @@ class SignalBusTest {
             assertFalse(reactionCalled, "Reaction should not be called after reset")
             coVerify(exactly = 0) { reaction.handler(any()) }
         }
-        
+
         @Test
         @DisplayName("should handle multiple registrations of the same reaction")
         fun handlesMultipleRegistrationsOfSameReaction() = runTest {
             // Arrange
             val signal = SignalHandle<String>("testSignal")
             var callCount = 0
-            
+
             val reaction = createStringReaction { callCount++ }
-            
+
             // Act - register multiple times
             SignalBus.register(signal, reaction)
             SignalBus.register(signal, reaction) // Register again
-            
+
             SignalBus.emit(signal, "test")
             testScope.advanceUntilIdle()
 
             // Assert - should only be called once
             coVerify(exactly = 1) { reaction.handler(any()) }
         }
-        
+
         @Test
         @DisplayName("should allow unregistering a reaction that wasn't registered")
         fun allowsUnregisteringNonExistentReaction() = runTest {
             // Arrange
             val signal = SignalHandle<String>("testSignal")
             val reaction = createStringReaction()
-            
+
             // Act - should not throw
             SignalBus.unregister(signal, reaction)
-            
+
             // No assertions - test passes if no exception is thrown
         }
     }

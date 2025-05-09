@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import runix.primitives.module.AppModule
 import runix.primitives.signal.SignalHandle
-import runix.runtime.internal.SignalBus
+import runix.primitives.signal.SignalBus
 import kotlin.test.assertEquals
 
 class ReactionHandleTest {
