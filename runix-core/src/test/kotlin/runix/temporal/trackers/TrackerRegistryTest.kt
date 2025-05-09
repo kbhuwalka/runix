@@ -29,7 +29,7 @@ class TrackerRegistryTest {
     @Test
     fun `register and retrieve BooleanTracker`() {
         val flow = MutableStateFlow(false)
-        val tracker = BooleanTracker(flow, retention = kotlin.time.Duration.ZERO) {}
+        val tracker = BooleanTracker(flow, retention = kotlin.time.Duration.ZERO)
         TrackerRegistry.register("bool", tracker)
 
         val retrieved = TrackerRegistry.getBooleanTracker("bool")
@@ -39,7 +39,7 @@ class TrackerRegistryTest {
     @Test
     fun `register and retrieve NumericTracker`() {
         val flow = MutableStateFlow(0.0)
-        val tracker = NumericTracker(flow, retention = kotlin.time.Duration.ZERO) {}
+        val tracker = NumericTracker(flow, retention = kotlin.time.Duration.ZERO)
         TrackerRegistry.register("num", tracker)
 
         val retrieved = TrackerRegistry.getNumericTracker("num")
@@ -49,7 +49,7 @@ class TrackerRegistryTest {
     @Test
     fun `register and retrieve CategoricalTracker`() {
         val flow = MutableStateFlow(DummyState.A)
-        val tracker = CategoricalTracker(flow, retention = kotlin.time.Duration.ZERO) {}
+        val tracker = CategoricalTracker(flow, retention = kotlin.time.Duration.ZERO)
         TrackerRegistry.register("cat", tracker)
 
         val retrieved = TrackerRegistry.getCategoricalTracker("cat")
@@ -75,8 +75,7 @@ class TrackerRegistryTest {
     fun `unregister stops and clears BooleanTracker`() {
         val tracker = object : BooleanTracker(
             flow = MutableStateFlow(false),
-            retention = kotlin.time.Duration.ZERO,
-            onUpdate = {}
+            retention = kotlin.time.Duration.ZERO
         ) {
             var stopCalled = false
             var clearCalled = false

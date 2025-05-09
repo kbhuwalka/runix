@@ -52,7 +52,7 @@ class CategoricalConditionTypeTest {
     @Test
     fun `IsInState returns True if current state matches`() = runTest(scheduler) {
         val flow = MutableStateFlow(Mode.IDLE)
-        val tracker = CategoricalTracker(flow, Duration.ZERO) {}
+        val tracker = CategoricalTracker(flow, Duration.ZERO)
         val expr = IsInState(Mode.IDLE).compileExpression("isIn", TestProvider(tracker))
         assertEquals(ConditionEval.True, expr())
     }
@@ -60,7 +60,7 @@ class CategoricalConditionTypeTest {
     @Test
     fun `PersistedInState returns True if state held for duration`() = runTest(scheduler) {
         val flow = MutableStateFlow(Mode.CHARGING)
-        val tracker = CategoricalTracker(flow, 5.seconds) {}
+        val tracker = CategoricalTracker(flow, 5.seconds)
         val expr = PersistedInState(Mode.CHARGING, 5.seconds).compileExpression("persisted", TestProvider(tracker))
 
         advanceTimeBy(5000)
@@ -70,7 +70,7 @@ class CategoricalConditionTypeTest {
     @Test
     fun `WasInStateFor returns True when state held in past window`() = runTest(scheduler) {
         val flow = MutableStateFlow(Mode.RUNNING)
-        val tracker = CategoricalTracker(flow, 10.seconds) {}
+        val tracker = CategoricalTracker(flow, 10.seconds)
         val expr = WasInStateFor(Mode.RUNNING, forDuration = 3.seconds, inLast = 10.seconds)
             .compileExpression("wasIn", TestProvider(tracker))
 
@@ -86,7 +86,7 @@ class CategoricalConditionTypeTest {
     @Test
     fun `WasEverInState returns True if state occurred at all`() = runTest(scheduler) {
         val flow = MutableStateFlow(Mode.IDLE)
-        val tracker = CategoricalTracker(flow, 10.seconds) {}
+        val tracker = CategoricalTracker(flow, 10.seconds)
         val expr = WasEverInState(Mode.RUNNING, 10.seconds).compileExpression("wasEverIn", TestProvider(tracker))
 
         flow.value = Mode.RUNNING
@@ -100,7 +100,7 @@ class CategoricalConditionTypeTest {
     @Test
     fun `TransitionedTo returns True when state is entered`() = runTest(scheduler) {
         val flow = MutableStateFlow(Mode.IDLE)
-        val tracker = CategoricalTracker(flow, 10.seconds) {}
+        val tracker = CategoricalTracker(flow, 10.seconds)
         val expr = TransitionedTo(Mode.CHARGING, forDuration = 0.seconds, inLast = 10.seconds)
             .compileExpression("to", TestProvider(tracker))
 
@@ -112,7 +112,7 @@ class CategoricalConditionTypeTest {
     @Test
     fun `TransitionedFrom returns True when state is exited`() = runTest(scheduler) {
         val flow = MutableStateFlow(Mode.CHARGING)
-        val tracker = CategoricalTracker(flow, 10.seconds) {}
+        val tracker = CategoricalTracker(flow, 10.seconds)
         val expr = TransitionedFrom(Mode.CHARGING, forDuration = 0.seconds, inLast = 10.seconds)
             .compileExpression("from", TestProvider(tracker))
 
@@ -124,7 +124,7 @@ class CategoricalConditionTypeTest {
     @Test
     fun `TransitionedThrough returns True if full sequence occurs`() = runTest(scheduler) {
         val flow = MutableStateFlow(Mode.IDLE)
-        val tracker = CategoricalTracker(flow, 10.seconds) {}
+        val tracker = CategoricalTracker(flow, 10.seconds)
         val expr = TransitionedThrough(listOf(Mode.IDLE, Mode.RUNNING, Mode.CHARGING), 10.seconds)
             .compileExpression("through", TestProvider(tracker))
 

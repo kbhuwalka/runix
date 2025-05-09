@@ -1,5 +1,8 @@
 package runix.temporal
 
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import runix.runtime.internal.RuntimeScope
 import runix.temporal.condition.TemporalExpression
 import runix.temporal.trackers.TrackerRegistry
 
@@ -25,14 +28,26 @@ internal data class CompiledMonitor(
     private val bindings: List<FlowBinding<*>>
 ) {
     private var started = false
+    private val flowUpdateJobs = mutableListOf<Job>()
 
     fun start(onUpdate: () -> Unit) {
         if (started) return
         started = true
 
         for (binding in bindings) {
-            val tracker = binding.createTracker(onUpdate)
+            val tracker = binding.tracker
             tracker.registerWith(binding.key)
+        }
+
+        val uniqueFlows = bindings.mapTo(mutableSetOf()) { it.sourceFlow }
+
+        uniqueFlows.forEach { flow ->
+            val job  = RuntimeScope.scope.launch {
+                flow.collect {
+                    onUpdate()
+                }
+            }
+            flowUpdateJobs.add(job)
         }
     }
 
@@ -41,5 +56,7 @@ internal data class CompiledMonitor(
         started = false
 
         bindings.forEach { TrackerRegistry.unregister(it.key) }
+        flowUpdateJobs.forEach { it.cancel() }
+        flowUpdateJobs.clear()
     }
 }

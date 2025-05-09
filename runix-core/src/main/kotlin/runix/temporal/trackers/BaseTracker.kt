@@ -33,8 +33,7 @@ internal abstract class BaseTracker<T>(
      * Collector scope—defaults to the global RuntimeScope but can be overridden
      * in tests or alternate contexts.
      */
-    scope: CoroutineScope = RuntimeScope.scope,
-    private val onUpdate: () -> Unit
+    scope: CoroutineScope = RuntimeScope.scope
 ) {
 
     abstract fun registerWith(key: String)
@@ -52,7 +51,6 @@ internal abstract class BaseTracker<T>(
                 val mark = Time.markNow()
                 println("Adding: $value, at= $mark")
                 history.append(value, mark)
-                onUpdate()
             }
         } catch (e: Throwable) {
             // If the flow itself throws, rethrow or optionally trace/log here.

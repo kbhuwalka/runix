@@ -39,7 +39,7 @@ class BooleanTrackerTest {
     @Test
     fun `evaluateLatestPersisted returns True when value has been held long enough`() = runTest(scheduler) {
         val flow = MutableStateFlow(true)
-        val tracker = BooleanTracker(flow, 10.seconds, this) {}
+        val tracker = BooleanTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         advanceTimeBy(5.seconds)
@@ -52,7 +52,7 @@ class BooleanTrackerTest {
     @Test
     fun `evaluateLatestPersisted returns Delayed when dwell time not yet satisfied`() = runTest(scheduler) {
         val flow = MutableStateFlow(true)
-        val tracker = BooleanTracker(flow, 10.seconds, this) {}
+        val tracker = BooleanTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         advanceTimeBy(2.seconds)
@@ -65,7 +65,7 @@ class BooleanTrackerTest {
     @Test
     fun `evaluateLatestPersisted returns False when predicate does not match current value`() = runTest(scheduler) {
         val flow = MutableStateFlow(false)
-        val tracker = BooleanTracker(flow, 10.seconds, this) {}
+        val tracker = BooleanTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         advanceTimeBy(2.seconds)
@@ -80,7 +80,7 @@ class BooleanTrackerTest {
     @Test
     fun `evaluatePastTransition returns True when value was held long enough`() = runTest(scheduler) {
         val flow = MutableStateFlow(false)
-        val tracker = BooleanTracker(flow, 10.seconds, this) {}
+        val tracker = BooleanTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         flow.value = true
@@ -97,7 +97,7 @@ class BooleanTrackerTest {
     @Test
     fun `evaluatePastTransition returns Delayed when value is still holding but not long enough`() = runTest(scheduler) {
         val flow = MutableStateFlow(false)
-        val tracker = BooleanTracker(flow, 10.seconds, this) {}
+        val tracker = BooleanTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         flow.value = true
@@ -112,7 +112,7 @@ class BooleanTrackerTest {
     @Test
     fun `evaluatePastTransition returns False when value was not held long enough`() = runTest(scheduler) {
         val flow = MutableStateFlow(false)
-        val tracker = BooleanTracker(flow, 10.seconds, this) {}
+        val tracker = BooleanTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         flow.value = true
@@ -129,7 +129,7 @@ class BooleanTrackerTest {
     @Test
     fun `evaluatePastTransition returns False when predicate never matched`() = runTest(scheduler) {
         val flow = MutableStateFlow(false)
-        val tracker = BooleanTracker(flow, 10.seconds, this) {}
+        val tracker = BooleanTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         advanceTimeBy(5.seconds)
@@ -142,7 +142,7 @@ class BooleanTrackerTest {
     @Test
     fun `evaluatePastTransition returns True when last matching value satisfies dwell`() = runTest(scheduler) {
         val flow = MutableStateFlow(false)
-        val tracker = BooleanTracker(flow, 10.seconds, this) {}
+        val tracker = BooleanTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         flow.value = true
@@ -159,7 +159,7 @@ class BooleanTrackerTest {
     @Test
     fun `evaluateFluctuated returns False when only one value exists`() = runTest(scheduler) {
         val flow = MutableStateFlow(true)
-        val tracker = BooleanTracker(flow, 10.seconds, this) {}
+        val tracker = BooleanTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         advanceTimeBy(2.seconds)
@@ -172,7 +172,7 @@ class BooleanTrackerTest {
     @Test
     fun `evaluateFluctuated returns True when value changed`() = runTest(scheduler) {
         val flow = MutableStateFlow(true)
-        val tracker = BooleanTracker(flow, 10.seconds, this) {}
+        val tracker = BooleanTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         flow.value = false

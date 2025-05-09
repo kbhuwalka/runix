@@ -45,7 +45,7 @@ class CategoricalTrackerTest {
     @Test
     fun `transitionedTo returns True when dwell-time is satisfied`() = runTest(scheduler) {
         val flow = MutableStateFlow(Mode.IDLE)
-        val tracker = CategoricalTracker(flow, 10.seconds, this) {}
+        val tracker = CategoricalTracker(flow, 10.seconds, this)
         advanceTimeBy(5.seconds)
         advanceUntilIdle()
 
@@ -66,7 +66,7 @@ class CategoricalTrackerTest {
     @Test
     fun `transitionedTo returns Delayed if dwell-time not yet satisfied and still in state`() = runTest(scheduler) {
         val flow = MutableStateFlow(Mode.IDLE)
-        val tracker = CategoricalTracker(flow, 10.seconds, this) {}
+        val tracker = CategoricalTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         flow.value = Mode.CHARGING
@@ -83,7 +83,7 @@ class CategoricalTrackerTest {
     @Test
     fun `transitionedTo returns False if exited state early`() = runTest(scheduler) {
         val flow = MutableStateFlow(Mode.IDLE)
-        val tracker = CategoricalTracker(flow, 10.seconds, this) {}
+        val tracker = CategoricalTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         flow.value = Mode.CHARGING
@@ -103,7 +103,7 @@ class CategoricalTrackerTest {
     @Test
     fun `transitionedTo returns False if no transition occurs`() = runTest(scheduler) {
         val flow = MutableStateFlow(Mode.IDLE)
-        val tracker = CategoricalTracker(flow, 10.seconds, this) {}
+        val tracker = CategoricalTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         advanceTimeBy(5.seconds)
@@ -121,7 +121,7 @@ class CategoricalTrackerTest {
     @Test
     fun `latest state satisfies dwell time`() = runTest(scheduler) {
         val flow = MutableStateFlow(Mode.CHARGING)
-        val tracker = CategoricalTracker(flow, 10.seconds, this) {}
+        val tracker = CategoricalTracker(flow, 10.seconds, this)
         advanceUntilIdle()
         advanceTimeBy(6.seconds)
 
@@ -137,7 +137,7 @@ class CategoricalTrackerTest {
     @Test
     fun `latest state does not satisfy dwell time returns Delayed`() = runTest(scheduler) {
         val flow = MutableStateFlow(Mode.MOVING)
-        val tracker = CategoricalTracker(flow, 10.seconds, this) {}
+        val tracker = CategoricalTracker(flow, 10.seconds, this)
         advanceUntilIdle()
         advanceTimeBy(1.seconds)
 
@@ -153,7 +153,7 @@ class CategoricalTrackerTest {
     @Test
     fun `latest state mismatch returns False`() = runTest(scheduler) {
         val flow = MutableStateFlow(Mode.IDLE)
-        val tracker = CategoricalTracker(flow, 10.seconds, this) {}
+        val tracker = CategoricalTracker(flow, 10.seconds, this)
         advanceUntilIdle()
         advanceTimeBy(3.seconds)
 
@@ -169,7 +169,7 @@ class CategoricalTrackerTest {
     @Test
     fun `evaluatePastTransition returns True if final value matches and duration held`() = runTest(scheduler) {
         val flow = MutableStateFlow(Mode.IDLE)
-        val tracker = CategoricalTracker(flow, 5.seconds) {}
+        val tracker = CategoricalTracker(flow, 5.seconds)
 
         advanceTimeBy(6000) // advance more than forTime
 
@@ -184,7 +184,7 @@ class CategoricalTrackerTest {
     @Test
     fun `evaluatePastTransition returns Delayed if final value matches but duration not held`() = runTest(scheduler) {
         val flow = MutableStateFlow(Mode.IDLE)
-        val tracker = CategoricalTracker(flow, 5.seconds) {}
+        val tracker = CategoricalTracker(flow, 5.seconds)
         flow.value = Mode.IDLE
 
         advanceTimeBy(2000) // not long enough
@@ -202,7 +202,7 @@ class CategoricalTrackerTest {
     @Test
     fun `sequence match succeeds`() = runTest(scheduler) {
         val flow = MutableStateFlow(Mode.IDLE)
-        val tracker = CategoricalTracker(flow, 30.seconds, this) {}
+        val tracker = CategoricalTracker(flow, 30.seconds, this)
         advanceUntilIdle()
 
         flow.value = Mode.CHARGING
@@ -223,7 +223,7 @@ class CategoricalTrackerTest {
     @Test
     fun `sequence match fails due to order break`() = runTest(scheduler) {
         val flow = MutableStateFlow(Mode.IDLE)
-        val tracker = CategoricalTracker(flow, 30.seconds, this) {}
+        val tracker = CategoricalTracker(flow, 30.seconds, this)
         advanceUntilIdle()
 
         flow.value = Mode.MOVING
@@ -242,7 +242,7 @@ class CategoricalTrackerTest {
     @Test
     fun `sequence match fails with insufficient entries`() = runTest(scheduler) {
         val flow = MutableStateFlow(Mode.CHARGING)
-        val tracker = CategoricalTracker(flow, 10.seconds, this) {}
+        val tracker = CategoricalTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         val result = tracker.evaluateTransitionSequence(
