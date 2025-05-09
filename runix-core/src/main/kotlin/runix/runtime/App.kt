@@ -2,6 +2,8 @@ package runix.runtime
 
 import kotlinx.coroutines.runBlocking
 import runix.primitives.module.AppModule
+import runix.tracing.TraceCollector
+import runix.tracing.reporters.ConsoleTraceReporter
 import java.util.concurrent.CountDownLatch
 
 /**
@@ -112,6 +114,7 @@ abstract class App : Activatable {
     suspend fun startAsync() {
         // Only allow starting once
         check(!isRunning) { "App is already running" }
+        TraceCollector.registerReporter(ConsoleTraceReporter)
         
         // Initialize the runtime environment
         AppRuntime.initialize()
@@ -133,13 +136,13 @@ abstract class App : Activatable {
      * The app will shut down automatically when the JVM terminates.
      */
     fun stop() {
-        // Programmatically request shutdown
-        shutdownLatch.countDown()
-        
         // Block until complete
         runBlocking {
             stopAsync()
         }
+
+        // Programmatically request shutdown
+        shutdownLatch.countDown()
     }
     
     /**
@@ -201,7 +204,7 @@ abstract class App : Activatable {
     internal fun setupShutdownHook() {
         Runtime.getRuntime().addShutdownHook(Thread {
             println("\n🛑 Received shutdown signal")
-            shutdownLatch.countDown()
+            stop()
         })
     }
 }
