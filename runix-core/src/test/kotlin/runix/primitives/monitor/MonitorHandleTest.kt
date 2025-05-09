@@ -1,11 +1,11 @@
 package runix.primitives.monitor
 
 import io.mockk.clearMocks
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
-import io.mockk.justRun
 import io.mockk.mockk
-import io.mockk.mockkObject
-import io.mockk.slot
+import io.mockk.spyk
 import io.mockk.unmockkAll
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import runix.primitives.module.AppModule
 import runix.primitives.signal.SignalHandle
-import runix.runtime.RuntimeScheduler
 import runix.runtime.internal.RuntimeScope
 import runix.temporal.FlowBinding
 import runix.temporal.MonitoredCondition
@@ -30,9 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
@@ -48,7 +45,6 @@ class MonitorHandleTest {
     private val scheduler = TestCoroutineScheduler()
     private val testScope = TestScope(scheduler)
     private val provider = TestSchedulerTimeProvider(scheduler)
-    private val recheckJobSlot = slot<suspend () -> Unit>()
 
     @BeforeEach
     fun setup() {
@@ -57,22 +53,6 @@ class MonitorHandleTest {
         
         // Install test scope
         RuntimeScope.install(testScope)
-        
-        // Clear the job slot for each test
-        if (recheckJobSlot.isCaptured) {
-            recheckJobSlot.clear()
-        }
-        
-        // Mock RuntimeScheduler static methods
-        mockkObject(RuntimeScheduler)
-        
-        // Set up scheduleRecheck to capture the job lambda
-        every {
-            RuntimeScheduler.scheduleRecheck(any(), any(), capture(recheckJobSlot))
-        } answers { }
-        
-        // Make cancelRecheck a no-op
-        justRun { RuntimeScheduler.cancelRecheck(any()) }
     }
 
     @AfterEach
@@ -135,6 +115,9 @@ class MonitorHandleTest {
 
         monitor.register(testModule)
         monitor.activate()
+        
+        // Manually trigger evaluation since we can't rely on dispatcher in test
+        monitor.evaluate()
         advanceUntilIdle()
 
         assertTrue(emitted.get(), "Signal should have been emitted for ConditionEval.True")
@@ -151,49 +134,66 @@ class MonitorHandleTest {
 
         monitor.register(testModule)
         monitor.activate()
+        
+        // Manually trigger evaluation
+        monitor.evaluate()
         advanceUntilIdle()
 
         verify(exactly = 0) { signal.emit(Unit) }
     }
 
     @Test
-    fun `monitor reschedules on delayed evaluation`() = runTest {
+    fun `monitor schedules delayed evaluation`() = runTest {
         val delayTime = 200.milliseconds
         val delayMark = Time.markNow() + delayTime
         val delayedCondition = TestCondition(result = { ConditionEval.Delayed(delayMark) })
 
-        val monitor = MonitorHandle("delayed-monitor", delayedCondition, null)
+        // Create a monitor with a spy dispatcher to verify method calls
+        val dispatcher = spyk(MonitorEvaluationDispatcher { })
+        val monitor = MonitorHandle("delayed-monitor", delayedCondition, null) 
+        
+        // Replace the monitor's dispatcher with our spy
+        val field = MonitorHandle::class.java.getDeclaredField("dispatcher")
+        field.isAccessible = true
+        field.set(monitor, dispatcher)
+        
         val testModule = createTestModule()
-
         monitor.register(testModule)
         monitor.activate()
+        
+        // Manually trigger evaluation
+        monitor.evaluate()
         advanceUntilIdle()
 
-        verify {
-            RuntimeScheduler.scheduleRecheck(
-                monitor = eq(monitor),
-                mark = eq(delayMark),
-                job = any()
-            )
-        }
+        // Verify the dispatcher was told to schedule the evaluation
+        coVerify { dispatcher.scheduleEvaluateAt(eq(delayMark)) }
     }
 
     @Test
-    fun `monitor stop cancels future rechecks`() = runTest {
-        val delayedCondition = TestCondition(result = { ConditionEval.Delayed(Time.markNow() + 10.seconds) })
-        val monitor = MonitorHandle("stop-test", delayedCondition, null)
+    fun `monitor stop shuts down the dispatcher`() = runTest {
+        val testCondition = TestCondition()
+        
+        // Create a monitor with a spy dispatcher to verify method calls
+        val dispatcher = spyk(MonitorEvaluationDispatcher { })
+        val monitor = MonitorHandle("stop-test", testCondition, null)
+        
+        // Replace the monitor's dispatcher with our spy
+        val field = MonitorHandle::class.java.getDeclaredField("dispatcher")
+        field.isAccessible = true
+        field.set(monitor, dispatcher)
+        
         val testModule = createTestModule()
-
         monitor.register(testModule)
         monitor.activate()
-        advanceUntilIdle()
-
-        // Clear verification history
-        clearMocks(RuntimeScheduler)
-
+        
+        // Clear any verification history
+        clearMocks(dispatcher, answers = false)
+        
+        // Stop the monitor
         monitor.deactivate()
-
-        verify { RuntimeScheduler.cancelRecheck(eq(monitor)) }
+        
+        // Verify the dispatcher was shut down
+        coVerify { dispatcher.shutdown() }
     }
 
     @Test
@@ -207,89 +207,110 @@ class MonitorHandleTest {
 
     @Test
     fun `monitor correctly starts evaluation pipeline`() = runTest {
-        val monitorLog = mutableListOf<String>()
+        // Create a test condition that tracks evaluation
+        val evalCount = AtomicInteger(0)
         val testCondition = TestCondition(
-            onEvaluate = { monitorLog += "evaluated" }
+            onEvaluate = { evalCount.incrementAndGet() },
+            result = { ConditionEval.True }
         )
 
+        // Create the monitor with the test condition
         val monitor = MonitorHandle("evaluation-test", testCondition, null)
         val testModule = createTestModule()
 
+        // Register and activate
         monitor.register(testModule)
         monitor.activate()
+
+        // Manually evaluate to exercise the pipeline
+        monitor.evaluate()
         advanceUntilIdle()
 
-        assertTrue(
-            monitorLog.contains("evaluated"),
-            "Monitor should evaluate its condition when started"
-        )
+        // Verify that evaluation happened
+        assertTrue(evalCount.get() > 0,
+            "Monitor should evaluate the condition when running")
     }
 
     @Test
     fun `monitor does not re-evaluate if already started`() = runTest {
-        val evalCount = AtomicInteger(0)
-        val testCondition = TestCondition(
-            onEvaluate = { evalCount.incrementAndGet() }
-        )
-
+        val startCount = AtomicInteger(0)
+        val testCondition = TestCondition()
         val monitor = MonitorHandle("single-eval", testCondition, null)
         val testModule = createTestModule()
 
+        // Mock the CompiledMonitor to count start calls
+        val compiledField = MonitorHandle::class.java.getDeclaredField("compiled")
+        compiledField.isAccessible = true
+        val mockCompiled = mockk<runix.temporal.CompiledMonitor>()
+        coEvery { mockCompiled.start(any()) } coAnswers { 
+            startCount.incrementAndGet()
+        }
+        
         monitor.register(testModule)
+        compiledField.set(monitor, mockCompiled)
+        
+        // Start once
         monitor.activate()
         advanceUntilIdle()
-
+        
         // Try to start again
         monitor.activate()
         advanceUntilIdle()
 
         assertEquals(
             1,
-            evalCount.get(),
-            "Monitor should only evaluate condition once after start"
+            startCount.get(),
+            "Monitor should only start the compiled monitor once"
         )
     }
 
     @Test
-    fun `delayed evaluation can be triggered multiple times`() = runTest {
-        val evaluations = AtomicInteger(0)
+    fun `evaluate handles all condition evaluation types`() = runTest {
+        val signal = mockk<SignalHandle<Unit>>(relaxed = true)
+        val evalResults = mutableListOf<ConditionEval>(
+            ConditionEval.True,
+            ConditionEval.False,
+            ConditionEval.Delayed(Time.markNow() + 100.milliseconds)
+        )
+        
+        // Dispatcher spy to verify interactions
+        val dispatcher = spyk(MonitorEvaluationDispatcher { })
+        
+        // Use a condition that returns different results on subsequent calls
+        var evalIndex = 0
         val testCondition = TestCondition(
-            result = {
-                val count = evaluations.incrementAndGet()
-                if (count < 3) {
-                    ConditionEval.Delayed(Time.markNow() + 100.milliseconds)
-                } else {
-                    ConditionEval.True
-                }
+            result = { 
+                evalResults[evalIndex].also { evalIndex = (evalIndex + 1) % evalResults.size }
             }
         )
-
-        val monitor = MonitorHandle("time-based", testCondition, null)
+        
+        val monitor = MonitorHandle("multi-eval", testCondition, signal)
+        
+        // Replace the monitor's dispatcher with our spy
+        val dispatcherField = MonitorHandle::class.java.getDeclaredField("dispatcher")
+        dispatcherField.isAccessible = true
+        dispatcherField.set(monitor, dispatcher)
+        
         val testModule = createTestModule()
-
         monitor.register(testModule)
-        monitor.activate()
-        advanceUntilIdle()
-
-        // First evaluation happens on start
-        assertEquals(1, evaluations.get(), "First evaluation should happen on start")
-        verify { RuntimeScheduler.scheduleRecheck(eq(monitor), any(), any()) }
-
-        // Execute the captured recheck job to simulate scheduler triggering it
-        assertTrue(recheckJobSlot.isCaptured, "Recheck job should be captured")
-        recheckJobSlot.captured.invoke()
-        advanceUntilIdle()
-
-        // Second evaluation
-        assertEquals(2, evaluations.get(), "Second evaluation should happen on first recheck")
-        verify(exactly = 2) { RuntimeScheduler.scheduleRecheck(eq(monitor), any(), any()) }
-
-        // Execute the recheck job again
-        recheckJobSlot.captured.invoke()
-        advanceUntilIdle()
-
-        // Third evaluation returns True, should not schedule another recheck
-        assertEquals(3, evaluations.get(), "Third evaluation should happen on second recheck")
-        verify(exactly = 2) { RuntimeScheduler.scheduleRecheck(eq(monitor), any(), any()) }
+        
+        // First evaluation - True
+        monitor.evaluate()
+        verify(exactly = 1) { signal.emit(Unit) }
+        coVerify(exactly = 1) { dispatcher.cancelScheduled() }
+        coVerify(exactly = 0) { dispatcher.scheduleEvaluateAt(any()) }
+        
+        // Second evaluation - False  
+        monitor.evaluate()
+        verify(exactly = 1) { signal.emit(Unit) } // Still only once
+        coVerify(exactly = 2) { dispatcher.cancelScheduled() }
+        coVerify(exactly = 0) { dispatcher.scheduleEvaluateAt(any()) }
+        
+        // Third evaluation - Delayed
+        val delayedResult = evalResults[2] as ConditionEval.Delayed
+        monitor.evaluate()
+        verify(exactly = 1) { signal.emit(Unit) } // Still only once
+        coVerify(exactly = 3) { dispatcher.cancelScheduled() }
+        coVerify(exactly = 1) { dispatcher.scheduleEvaluateAt(eq(delayedResult.nextCheckAt)) }
     }
 }

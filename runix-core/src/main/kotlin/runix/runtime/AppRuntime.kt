@@ -23,9 +23,6 @@ internal object AppRuntime {
         // Create and install the RuntimeScope
         val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         RuntimeScope.install(appScope)
-
-        // Initialize runtime scheduler
-        RuntimeScheduler.start()
         
         isRunning = true
     }
@@ -36,16 +33,8 @@ internal object AppRuntime {
      */
     fun shutdown() {
         if (!isRunning) return
-
-        try {
-            // Ensure scheduler is stopped
-            RuntimeScheduler.stop()
-        } catch (_: Exception) {
-
-        } finally {
-            shutDownRuntimeScope()
-            isRunning = false
-        }
+        shutDownRuntimeScope()
+        isRunning = false
     }
 
     private fun shutDownRuntimeScope() {

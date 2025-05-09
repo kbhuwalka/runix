@@ -1,9 +1,8 @@
 package runix.primitives.monitor
 
-import runix.runtime.Activatable
 import runix.primitives.module.AppModule
 import runix.primitives.signal.SignalHandle
-import runix.runtime.RuntimeScheduler
+import runix.runtime.Activatable
 import runix.runtime.internal.Registerable
 import runix.runtime.internal.RegistrationGuard
 import runix.temporal.CompiledMonitor
@@ -33,7 +32,8 @@ class MonitorHandle internal constructor(
 ) : Registerable, Activatable {
     private val guard = RegistrationGuard()
     private lateinit var compiled: CompiledMonitor
-    private var started = AtomicBoolean(false)
+    internal var started = AtomicBoolean(false)
+    internal val dispatcher = MonitorEvaluationDispatcher { evaluate() }
 
     /**
      * Registers this monitor to a module.
@@ -56,8 +56,7 @@ class MonitorHandle internal constructor(
         started.set(true)
 
         // Begin tracker observation and evaluation the pipeline
-        compiled.start { evaluateAndMaybeEmit() }
-        evaluateAndMaybeEmit() // Evaluate once at startup
+        compiled.start { dispatcher.requestEvaluate() }
     }
 
     /**
@@ -66,7 +65,7 @@ class MonitorHandle internal constructor(
     override suspend fun deactivate() {
         if (!started.get()) return
         compiled.stop()
-        RuntimeScheduler.cancelRecheck(this)
+        dispatcher.shutdown()
         started.set(false)
     }
 
@@ -76,16 +75,14 @@ class MonitorHandle internal constructor(
      * If [ConditionEval.Delayed], a recheck is scheduled.
      * If new values arrive before the recheck, it is canceled and reevaluated.
      */
-    internal fun evaluateAndMaybeEmit() {
+    internal suspend fun evaluate() {
         val result = compiled.condition.invoke()
 
-        RuntimeScheduler.cancelRecheck(this)
+        dispatcher.cancelScheduled()
         when (result) {
             is ConditionEval.True -> signal?.emit(Unit)
             is ConditionEval.False -> {} // no-op
-            is ConditionEval.Delayed -> RuntimeScheduler.scheduleRecheck(this, result.nextCheckAt) {
-                evaluateAndMaybeEmit()
-            }
+            is ConditionEval.Delayed -> dispatcher.scheduleEvaluateAt(result.nextCheckAt)
         }
     }
 

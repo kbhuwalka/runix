@@ -39,11 +39,6 @@ class AppRuntimeTest {
         every { RuntimeScope.scope } returns testScope
         justRun { RuntimeScope.install(any()) }
         justRun { RuntimeScope.clear() }
-
-        // Mock RuntimeScheduler
-        mockkObject(RuntimeScheduler)
-        justRun { RuntimeScheduler.start() }
-        justRun { RuntimeScheduler.stop() }
     }
 
     @AfterEach
@@ -64,7 +59,6 @@ class AppRuntimeTest {
 
             verifyOrder {
                 RuntimeScope.install(any<CoroutineScope>())
-                RuntimeScheduler.start()
             }
         }
 
@@ -95,7 +89,6 @@ class AppRuntimeTest {
             AppRuntime.shutdown()
 
             verify {
-                RuntimeScheduler.stop()
                 RuntimeScope.clear()
             }
         }
@@ -106,7 +99,6 @@ class AppRuntimeTest {
             AppRuntime.shutdown()
 
             verify(exactly = 0) {
-                RuntimeScheduler.stop()
                 RuntimeScope.clear()
             }
         }
@@ -126,15 +118,12 @@ class AppRuntimeTest {
 
             verify(exactly = 1) {
                 RuntimeScope.install(any<CoroutineScope>())
-                RuntimeScheduler.start()
-                RuntimeScheduler.stop()
                 RuntimeScope.clear()
             }
 
             io.mockk.clearMocks(
                 RuntimeScope, 
-                RuntimeScheduler, 
-                recordedCalls = true, 
+                recordedCalls = true,
                 answers = false
             )
 
@@ -145,8 +134,6 @@ class AppRuntimeTest {
 
             verify(exactly = 1) {
                 RuntimeScope.install(any<CoroutineScope>())
-                RuntimeScheduler.start()
-                RuntimeScheduler.stop()
                 RuntimeScope.clear()
             }
         }
@@ -161,8 +148,6 @@ class AppRuntimeTest {
         fun cleanupRuntimeEvenWithException() = runTest {
             AppRuntime.initialize()
             advanceUntilIdle()
-
-            every { RuntimeScheduler.stop() } throws RuntimeException("Scheduler stop failed")
 
             AppRuntime.shutdown()
 
