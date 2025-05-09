@@ -22,8 +22,10 @@ internal data class IsAbove(
     override val retention: Duration = Duration.ZERO
 ) : NumericConditionType {
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
-        val tracker: NumericTracker = provider.getNumericTracker(key)
-        return { tracker.evaluateLatestPersisted({ it > threshold }, retention) }
+        return {
+            val tracker: NumericTracker = provider.getNumericTracker(key)
+            tracker.evaluateLatestPersisted({ it > threshold }, retention)
+        }
     }
 }
 
@@ -35,8 +37,10 @@ internal data class IsBelow(
     override val retention: Duration = Duration.ZERO
 ) : NumericConditionType {
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
-        val tracker = provider.getNumericTracker(key)
-        return { tracker.evaluateLatestPersisted({ it < threshold }, retention) }
+        return {
+            val tracker = provider.getNumericTracker(key)
+            tracker.evaluateLatestPersisted({ it < threshold }, retention)
+        }
     }
 }
 
@@ -48,8 +52,10 @@ internal data class HasPersistedAbove(
     override val retention: Duration
 ) : NumericConditionType {
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
-        val tracker = provider.getNumericTracker(key)
-        return { tracker.evaluateLatestPersisted({ it > threshold }, retention) }
+        return {
+            val tracker = provider.getNumericTracker(key)
+            tracker.evaluateLatestPersisted({ it > threshold }, retention)
+        }
     }
 }
 
@@ -61,8 +67,10 @@ internal data class HasPersistedBelow(
     override val retention: Duration
 ) : NumericConditionType {
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
-        val tracker = provider.getNumericTracker(key)
-        return { tracker.evaluateLatestPersisted({ it < threshold }, retention) }
+        return {
+            val tracker = provider.getNumericTracker(key)
+            tracker.evaluateLatestPersisted({ it < threshold }, retention)
+        }
     }
 }
 
@@ -74,8 +82,10 @@ internal data class WasEverAbove(
     override val retention: Duration
 ) : NumericConditionType {
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
-        val tracker = provider.getNumericTracker(key)
-        return { tracker.evaluatePastTransition({ it > threshold }, Duration.ZERO) }
+        return {
+            val tracker = provider.getNumericTracker(key)
+            tracker.evaluatePastTransition({ it > threshold }, Duration.ZERO)
+        }
     }
 }
 
@@ -87,8 +97,10 @@ internal data class WasEverBelow(
     override val retention: Duration
 ) : NumericConditionType {
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
-        val tracker = provider.getNumericTracker(key)
-        return { tracker.evaluatePastTransition({ it < threshold }, Duration.ZERO) }
+        return {
+            val tracker = provider.getNumericTracker(key)
+            tracker.evaluatePastTransition({ it < threshold }, Duration.ZERO)
+        }
     }
 }
 
@@ -105,8 +117,10 @@ internal data class WasAboveFor(
     override val retention = inLast
 
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
-        val tracker = provider.getNumericTracker(key)
-        return { tracker.evaluatePastTransition({ it > threshold }, forDuration) }
+        return {
+            val tracker = provider.getNumericTracker(key)
+            tracker.evaluatePastTransition({ it > threshold }, forDuration)
+        }
     }
 }
 
@@ -123,8 +137,10 @@ internal data class WasBelowFor(
     override val retention = inLast
 
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
-        val tracker = provider.getNumericTracker(key)
-        return { tracker.evaluatePastTransition({ it < threshold }, forDuration) }
+        return {
+            val tracker = provider.getNumericTracker(key)
+            tracker.evaluatePastTransition({ it < threshold }, forDuration)
+        }
     }
 }
 
@@ -136,8 +152,10 @@ internal data class Increasing(
     override val retention: Duration
 ) : NumericConditionType {
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
-        val tracker = provider.getNumericTracker(key)
-        return { tracker.evaluateTrend { curr, prev -> curr < prev } }
+        return {
+            val tracker = provider.getNumericTracker(key)
+            tracker.evaluateTrend { curr, prev -> curr < prev }
+        }
     }
 }
 
@@ -149,8 +167,10 @@ internal data class Decreasing(
     override val retention: Duration
 ) : NumericConditionType {
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
-        val tracker = provider.getNumericTracker(key)
-        return { tracker.evaluateTrend { curr, prev -> curr > prev } }
+        return {
+            val tracker = provider.getNumericTracker(key)
+            tracker.evaluateTrend { curr, prev -> curr > prev }
+        }
     }
 }
 
@@ -166,8 +186,8 @@ internal data class StableWithin(
 ) : NumericConditionType {
 
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
-        val tracker = provider.getNumericTracker(key)
         return {
+            val tracker = provider.getNumericTracker(key)
             tracker.evaluateStabilityWindow { spread -> spread > margin * 2 }
         }
     }
@@ -185,8 +205,8 @@ internal data class FluctuatedBeyond(
 ) : NumericConditionType {
 
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
-        val tracker = provider.getNumericTracker(key)
         return {
+            val tracker = provider.getNumericTracker(key)
             tracker.hasFluctuatedBeyond(margin)
         }
     }

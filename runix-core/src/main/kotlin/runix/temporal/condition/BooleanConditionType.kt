@@ -26,8 +26,10 @@ internal data class IsTrue(
     override val retention: Duration = Duration.ZERO
 ) : BooleanConditionType {
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
-        val tracker: BooleanTracker = provider.getBooleanTracker(key)
-        return { tracker.evaluateLatestPersisted({ it }, retention) }
+        return {
+            val tracker: BooleanTracker = provider.getBooleanTracker(key)
+            tracker.evaluateLatestPersisted({ it }, retention)
+        }
     }
 }
 
@@ -39,8 +41,11 @@ internal data class HasPersistedTrue(
     override val retention: Duration
 ) : BooleanConditionType {
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
-        val tracker = provider.getBooleanTracker(key)
-        return { tracker.evaluateLatestPersisted({ it }, retention) }
+
+        return {
+            val tracker = provider.getBooleanTracker(key)
+            tracker.evaluateLatestPersisted({ it }, retention)
+        }
     }
 }
 
@@ -56,8 +61,10 @@ internal data class WasTrueFor(
     override val retention = inLast
 
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
-        val tracker = provider.getBooleanTracker(key)
-        return { tracker.evaluatePastTransition({ it }, forDuration) }
+        return {
+            val tracker = provider.getBooleanTracker(key)
+            tracker.evaluatePastTransition({ it }, forDuration)
+        }
     }
 }
 
@@ -71,8 +78,10 @@ internal data class WasEverTrue(
     override val retention = inLast
 
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
-        val tracker = provider.getBooleanTracker(key)
-        return { tracker.evaluatePastTransition({ it }, Duration.ZERO) }
+        return {
+            val tracker = provider.getBooleanTracker(key)
+            tracker.evaluatePastTransition({ it }, Duration.ZERO)
+        }
     }
 }
 
@@ -86,7 +95,9 @@ internal data class HasFluctuated(
     override val retention = inLast
 
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
-        val tracker = provider.getBooleanTracker(key)
-        return { tracker.evaluateFluctuated() }
+        return {
+            val tracker = provider.getBooleanTracker(key)
+            tracker.evaluateFluctuated()
+        }
     }
 }

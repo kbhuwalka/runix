@@ -28,8 +28,10 @@ internal data class IsInState<T>(
 
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
         @Suppress("UNCHECKED_CAST")
-        val tracker = provider.getCategoricalTracker(key) as CategoricalTracker<T>
-        return { tracker.evaluateLatestPersisted({ it == expected }, Duration.ZERO) }
+        return {
+            val tracker = provider.getCategoricalTracker(key) as CategoricalTracker<T>
+            tracker.evaluateLatestPersisted({ it == expected }, Duration.ZERO)
+        }
     }
 }
 
@@ -42,8 +44,10 @@ internal data class PersistedInState<T>(
 ) : CategoricalConditionType {
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
         @Suppress("UNCHECKED_CAST")
-        val tracker = provider.getCategoricalTracker(key) as CategoricalTracker<T>
-        return { tracker.evaluateLatestPersisted({ it == expected }, retention) }
+        return {
+            val tracker = provider.getCategoricalTracker(key) as CategoricalTracker<T>
+            tracker.evaluateLatestPersisted({ it == expected }, retention)
+        }
     }
 }
 
@@ -56,8 +60,10 @@ internal data class WasEverInState<T>(
 ) : CategoricalConditionType {
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
         @Suppress("UNCHECKED_CAST")
-        val tracker = provider.getCategoricalTracker(key) as CategoricalTracker<T>
-        return { tracker.evaluatePastTransition({ _, curr -> curr == expected }, Duration.ZERO) }
+        return {
+            val tracker = provider.getCategoricalTracker(key) as CategoricalTracker<T>
+            tracker.evaluatePastTransition({ _, curr -> curr == expected }, Duration.ZERO)
+        }
     }
 }
 
@@ -73,8 +79,10 @@ internal data class WasInStateFor<T>(
 
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
         @Suppress("UNCHECKED_CAST")
-        val tracker = provider.getCategoricalTracker(key) as CategoricalTracker<T>
-        return { tracker.evaluatePastTransition({ prev, _ -> prev == expected }, forDuration) }
+        return {
+            val tracker = provider.getCategoricalTracker(key) as CategoricalTracker<T>
+            tracker.evaluatePastTransition({ prev, _ -> prev == expected }, forDuration)
+        }
     }
 }
 
@@ -88,8 +96,10 @@ internal data class TransitionedThrough<T>(
     override val retention = inLast
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
         @Suppress("UNCHECKED_CAST")
-        val tracker = provider.getCategoricalTracker(key) as CategoricalTracker<T>
-        return { tracker.evaluateTransitionSequence(states) }
+        return {
+            val tracker = provider.getCategoricalTracker(key) as CategoricalTracker<T>
+            tracker.evaluateTransitionSequence(states)
+        }
     }
 }
 
@@ -110,8 +120,10 @@ internal data class TransitionedTo<T>(
 
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
         @Suppress("UNCHECKED_CAST")
-        val tracker = provider.getCategoricalTracker(key) as CategoricalTracker<T>
-        return { tracker.evaluatePastTransition({ _, curr -> curr == expected }, forDuration) }
+        return {
+            val tracker = provider.getCategoricalTracker(key) as CategoricalTracker<T>
+            tracker.evaluatePastTransition({ _, curr -> curr == expected }, forDuration)
+        }
     }
 }
 
@@ -132,7 +144,9 @@ internal data class TransitionedFrom<T>(
 
     override fun compileExpression(key: String, provider: TrackerProvider): TemporalExpression {
         @Suppress("UNCHECKED_CAST")
-        val tracker = provider.getCategoricalTracker(key) as CategoricalTracker<T>
-        return { tracker.evaluatePastTransition({ prev, _ -> prev == from }, forDuration) }
+        return {
+            val tracker = provider.getCategoricalTracker(key) as CategoricalTracker<T>
+            tracker.evaluatePastTransition({ prev, _ -> prev == from }, forDuration)
+        }
     }
 }
