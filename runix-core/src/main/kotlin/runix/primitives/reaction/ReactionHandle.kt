@@ -49,5 +49,9 @@ class ReactionHandle<T> internal constructor(
         activated.set(false)
     }
 
+    internal suspend fun executeReaction(value: T) {
+        handler.invoke(value)
+    }
+
     override fun toString(): String = "Reaction($name)"
 }

@@ -1,5 +1,8 @@
 package runix.primitives.signal
 
+import io.mockk.coEvery
+import io.mockk.coJustRun
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.justRun
 import io.mockk.mockkObject
@@ -31,7 +34,7 @@ class SignalHandleTest {
     fun `signal function creates handle with correct name`() {
         val name = "testSignal"
         val signalHandle = signal<String>(name)
-        justRun { SignalBus.emit<String>(any(), any()) }
+        coJustRun { SignalBus.emit<String>(any(), any()) }
 
         assertEquals(name, signalHandle.name)
     }
@@ -49,11 +52,11 @@ class SignalHandleTest {
         val name = "dataAvailable"
         val signalHandle = SignalHandle<String>(name)
         val payload = "Test Data"
-        justRun { SignalBus.emit<String>(any(), any()) }
+        coJustRun { SignalBus.emit<String>(any(), any()) }
 
         signalHandle.emit(payload)
 
-        verify(exactly = 1) { SignalBus.emit(signalHandle, payload) }
+        coVerify(exactly = 1) { SignalBus.emit(signalHandle, payload) }
     }
 
     @Test
@@ -63,7 +66,7 @@ class SignalHandleTest {
 
         signalHandle.emit(Unit)
 
-        verify(exactly = 1) { SignalBus.emit(signalHandle, Unit) }
+        coVerify(exactly = 1) { SignalBus.emit(signalHandle, Unit) }
     }
 
     @Test
@@ -72,11 +75,11 @@ class SignalHandleTest {
         val name = "sensorReading"
         val signalHandle = SignalHandle<SensorData>(name)
         val payload = SensorData(23.5, System.currentTimeMillis())
-        justRun { SignalBus.emit<SensorData>(any(), any()) }
+        coJustRun { SignalBus.emit<SensorData>(any(), any()) }
 
         signalHandle.emit(payload)
 
-        verify(exactly = 1) { SignalBus.emit(signalHandle, payload) }
+        coVerify(exactly = 1) { SignalBus.emit(signalHandle, payload) }
     }
 
     @Test
@@ -100,9 +103,9 @@ class SignalHandleTest {
         val unitSignal = signal<Unit>("unitEvent")
 
         // Set up SignalBus to return some values so we can test type compatibility
-        every { SignalBus.emit(intSignal, any<Int>()) } returns Unit
-        every { SignalBus.emit(stringSignal, any<String>()) } returns Unit
-        every { SignalBus.emit(unitSignal, Unit) } returns Unit
+        coEvery { SignalBus.emit(intSignal, any<Int>()) } returns Unit
+        coEvery { SignalBus.emit(stringSignal, any<String>()) } returns Unit
+        coEvery { SignalBus.emit(unitSignal, Unit) } returns Unit
 
         // These should compile without errors
         intSignal.emit(42)
@@ -110,8 +113,8 @@ class SignalHandleTest {
         unitSignal.emit(Unit)
 
         // Verify the correct types were passed to SignalBus
-        verify { SignalBus.emit(intSignal, 42) }
-        verify { SignalBus.emit(stringSignal, "test") }
-        verify { SignalBus.emit(unitSignal, Unit) }
+        coVerify { SignalBus.emit(intSignal, 42) }
+        coVerify { SignalBus.emit(stringSignal, "test") }
+        coVerify { SignalBus.emit(unitSignal, Unit) }
     }
 }

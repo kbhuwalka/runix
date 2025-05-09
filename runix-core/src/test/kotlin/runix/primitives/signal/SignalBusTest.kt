@@ -1,11 +1,7 @@
 package runix.primitives.signal
 
-import io.mockk.coEvery
-import io.mockk.coVerify
-import io.mockk.every
-import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -14,8 +10,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import runix.RuntimeScopeTestHelper
-import runix.primitives.reaction.ReactionHandle
+import runix.primitives.reaction.reaction
+import runix.runtime.internal.RuntimeScope
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -24,242 +20,217 @@ import kotlin.test.assertTrue
 class SignalBusTest {
 
     // Test infrastructure setup
-    private val testDispatcher = StandardTestDispatcher()
-    private val testScope = TestScope(testDispatcher)
-    private val runtimeHelper = RuntimeScopeTestHelper(testScope)
+    private val scheduler = TestCoroutineScheduler()
+    private val testScope = TestScope(scheduler)
 
     @BeforeEach
     fun setup() {
-        // Setup RuntimeScope mocking with the helper
-        runtimeHelper.setup()
-
+        // Setup RuntimeScope for testing
+        RuntimeScope.install(testScope)
+        
         // Reset SignalBus state before each test
         SignalBus.reset()
     }
 
     @AfterEach
     fun tearDown() {
-        runtimeHelper.tearDown()
+        RuntimeScope.clear()
         SignalBus.reset()
     }
 
-    // Helper functions to create mocked reaction for String type
-    private fun createStringReaction(
-        name: String = "testReaction",
-        handler: suspend (String) -> Unit = {}
-    ): ReactionHandle<String> {
-        return mockk {
-            every { this@mockk.name } returns name
-            coEvery { this@mockk.handler(any()) } coAnswers { handler(firstArg()) }
-        }
-    }
-
-    // Helper functions to create mocked reaction for Int type
-    private fun createIntReaction(
-        name: String = "testReaction",
-        handler: suspend (Int) -> Unit = {}
-    ): ReactionHandle<Int> {
-        return mockk {
-            every { this@mockk.name } returns name
-            coEvery { this@mockk.handler(any()) } coAnswers { handler(firstArg()) }
-        }
-    }
-
     @Nested
-    @DisplayName("Signal emission and reaction handling")
-    inner class SignalEmissionAndReactions {
+    @DisplayName("Signal emission")
+    inner class SignalEmission {
 
         @Test
-        @DisplayName("should invoke registered reactions when a signal is emitted")
-        fun invokesRegisteredReactionsOnEmit() = runTest {
-            // Arrange
-            val signal = SignalHandle<String>("testSignal")
+        fun `emits signals to registered reactions`() = runTest(scheduler) {
+            val signal = signal<String>("testSignal")
             val value = "test value"
             var reaction1Called = false
             var reaction2Called = false
 
-            val reaction1 = createStringReaction("reaction1") {
-                if (it == value) reaction1Called = true
+            val reaction1 = reaction("reaction1", signal) { 
+                reaction1Called = true 
+            }
+            
+            val reaction2 = reaction("reaction2", signal) { 
+                reaction2Called = true 
             }
 
-            val reaction2 = createStringReaction("reaction2") {
-                if (it == value) reaction2Called = true
-            }
-
-            // Register reactions
             SignalBus.register(signal, reaction1)
             SignalBus.register(signal, reaction2)
 
-            // Act
             SignalBus.emit(signal, value)
-            testScope.advanceUntilIdle()
+            advanceUntilIdle()
 
-            // Assert
-            assertTrue(reaction1Called, "Reaction1 should be called")
-            assertTrue(reaction2Called, "Reaction2 should be called")
-            coVerify(exactly = 1) { reaction1.handler(value) }
-            coVerify(exactly = 1) { reaction2.handler(value) }
+            assertTrue(reaction1Called, "First reaction should be called")
+            assertTrue(reaction2Called, "Second reaction should be called")
         }
 
         @Test
-        @DisplayName("should not invoke unregistered reactions")
-        fun doesNotInvokeUnregisteredReactions() = runTest {
-            // Arrange
-            val signal = SignalHandle<String>("testSignal")
-            val value = "test value"
+        fun `does not invoke unregistered reactions`() = runTest(scheduler) {
+            val signal = signal<String>("testSignal")
             var reactionCalled = false
 
-            val reaction = createStringReaction { reactionCalled = true }
+            val reaction = reaction("testReaction", signal) { 
+                reactionCalled = true 
+            }
 
-            // Register and then unregister the reaction
+            // Register and then unregister
             SignalBus.register(signal, reaction)
             SignalBus.unregister(signal, reaction)
 
-            // Act
-            SignalBus.emit(signal, value)
-            testScope.advanceUntilIdle()
+            SignalBus.emit(signal, "test value")
+            advanceUntilIdle()
 
-            // Assert
-            assertFalse(reactionCalled, "Reaction should not be called after unregistration")
-            coVerify(exactly = 0) { reaction.handler(any()) }
+            assertFalse(reactionCalled, "Unregistered reaction should not be called")
         }
 
         @Test
-        @DisplayName("should continue processing other reactions when one throws an exception")
-        fun continuesProcessingAfterException() = runTest {
-            // Arrange
-            val signal = SignalHandle<String>("testSignal")
-            val value = "test value"
+        fun `continues processing when reaction throws exception`() = runTest(scheduler) {
+            val signal = signal<String>("testSignal")
             var errorReactionCalled = false
             var successReactionCalled = false
 
-            val errorReaction = createStringReaction("errorReaction") {
+            val errorReaction = reaction("errorReaction", signal) {
                 errorReactionCalled = true
                 throw RuntimeException("Test exception")
             }
 
-            val successReaction = createStringReaction("successReaction") {
+            val successReaction = reaction("successReaction", signal) {
                 successReactionCalled = true
             }
 
             SignalBus.register(signal, errorReaction)
             SignalBus.register(signal, successReaction)
 
-            // Act - should not throw exception up to the caller
-            SignalBus.emit(signal, value)
-            testScope.advanceUntilIdle()
+            SignalBus.emit(signal, "test value")
+            advanceUntilIdle()
 
-            // Assert
             assertTrue(errorReactionCalled, "Error reaction should be called")
-            assertTrue(successReactionCalled, "Success reaction should still be called")
+            assertTrue(successReactionCalled, "Success reaction should also be called")
         }
 
         @Test
-        @DisplayName("should not invoke reactions for unrelated signals")
-        fun doesNotInvokeReactionsForUnrelatedSignals() = runTest {
-            // Arrange
-            val signal1 = SignalHandle<String>("signal1")
-            val signal2 = SignalHandle<String>("signal2")
+        fun `only invokes reactions for the emitted signal`() = runTest(scheduler) {
+            val signal1 = signal<String>("signal1")
+            val signal2 = signal<String>("signal2")
+            
             var reaction1Called = false
             var reaction2Called = false
 
-            val reaction1 = createStringReaction { reaction1Called = true }
-            val reaction2 = createStringReaction { reaction2Called = true }
+            val reaction1 = reaction("reaction1", signal1) { reaction1Called = true }
+            val reaction2 = reaction("reaction2", signal2) { reaction2Called = true }
 
             SignalBus.register(signal1, reaction1)
             SignalBus.register(signal2, reaction2)
 
-            // Act - emit only signal1
             SignalBus.emit(signal1, "test")
-            testScope.advanceUntilIdle()
+            advanceUntilIdle()
 
-            // Assert
-            assertTrue(reaction1Called, "Reaction1 should be called")
-            assertFalse(reaction2Called, "Reaction2 should not be called")
+            assertTrue(reaction1Called, "Reaction for emitted signal should be called")
+            assertFalse(reaction2Called, "Reaction for non-emitted signal should not be called")
         }
 
         @Test
-        @DisplayName("should respect type safety of signals and reactions")
-        fun respectsTypeSafety() = runTest {
-            // Arrange
-            val stringSignal = SignalHandle<String>("stringSignal")
-            val intSignal = SignalHandle<Int>("intSignal")
+        fun `respects type safety of signals and reactions`() = runTest(scheduler) {
+            val stringSignal = signal<String>("stringSignal")
+            val intSignal = signal<Int>("intSignal")
 
             var stringReactionCalled = false
             var intReactionCalled = false
 
-            val stringReaction = createStringReaction { stringReactionCalled = true }
-            val intReaction = createIntReaction { intReactionCalled = true }
+            val stringReaction = reaction("stringReaction", stringSignal) { 
+                stringReactionCalled = true 
+            }
+            
+            val intReaction = reaction("intReaction", intSignal) { 
+                intReactionCalled = true 
+            }
 
             SignalBus.register(stringSignal, stringReaction)
             SignalBus.register(intSignal, intReaction)
 
-            // Act
             SignalBus.emit(stringSignal, "test")
-            testScope.advanceUntilIdle()
+            advanceUntilIdle()
 
-            // Assert
             assertTrue(stringReactionCalled, "String reaction should be called")
             assertFalse(intReactionCalled, "Int reaction should not be called")
         }
     }
 
     @Nested
-    @DisplayName("Lifecycle management")
-    inner class LifecycleManagement {
+    @DisplayName("Registration management")
+    inner class RegistrationManagement {
 
         @Test
-        @DisplayName("should be able to reset all registrations")
-        fun resetsAllRegistrations() = runTest {
-            // Arrange
-            val signal = SignalHandle<String>("testSignal")
+        fun `reset clears all registrations`() = runTest(scheduler) {
+            val signal = signal<String>("testSignal")
             var reactionCalled = false
 
-            val reaction = createStringReaction { reactionCalled = true }
-
+            val reaction = reaction("testReaction", signal) { 
+                reactionCalled = true 
+            }
+            
             SignalBus.register(signal, reaction)
 
-            // Act
             SignalBus.reset()
             SignalBus.emit(signal, "test")
-            testScope.advanceUntilIdle()
+            advanceUntilIdle()
 
-            // Assert
             assertFalse(reactionCalled, "Reaction should not be called after reset")
-            coVerify(exactly = 0) { reaction.handler(any()) }
         }
 
         @Test
-        @DisplayName("should handle multiple registrations of the same reaction")
-        fun handlesMultipleRegistrationsOfSameReaction() = runTest {
-            // Arrange
-            val signal = SignalHandle<String>("testSignal")
+        fun `registers reaction only once`() = runTest(scheduler) {
+            val signal = signal<String>("testSignal")
             var callCount = 0
 
-            val reaction = createStringReaction { callCount++ }
+            val reaction = reaction("testReaction", signal) { 
+                callCount++ 
+            }
 
-            // Act - register multiple times
             SignalBus.register(signal, reaction)
-            SignalBus.register(signal, reaction) // Register again
+            SignalBus.register(signal, reaction)
 
             SignalBus.emit(signal, "test")
-            testScope.advanceUntilIdle()
+            advanceUntilIdle()
 
-            // Assert - should only be called once
-            coVerify(exactly = 1) { reaction.handler(any()) }
+            kotlin.test.assertEquals(1, callCount, "Reaction should only be called once")
         }
 
         @Test
-        @DisplayName("should allow unregistering a reaction that wasn't registered")
-        fun allowsUnregisteringNonExistentReaction() = runTest {
-            // Arrange
-            val signal = SignalHandle<String>("testSignal")
-            val reaction = createStringReaction()
+        fun `safely handles unregistering non-existent reaction`() = runTest(scheduler) {
+            val signal = signal<String>("testSignal")
+            val reaction = reaction("testReaction", signal) { }
 
-            // Act - should not throw
             SignalBus.unregister(signal, reaction)
-
+            
             // No assertions - test passes if no exception is thrown
+        }
+        
+        @Test
+        fun `cleans up empty signal registrations`() = runTest(scheduler) {
+            // Arrange
+            val signal = signal<String>("testSignal")
+            val reaction = reaction("testReaction", signal) { }
+
+            SignalBus.register(signal, reaction)
+            
+            SignalBus.unregister(signal, reaction)
+            
+            // Create a new reaction and register it to verify the signal entry is recreated
+            var called = false
+            val newReaction = reaction("newReaction", signal) { 
+                called = true 
+            }
+            
+            SignalBus.register(signal, newReaction)
+
+            SignalBus.emit(signal, "test")
+            advanceUntilIdle()
+            
+            assertTrue(called, "New reaction should be called after registration")
         }
     }
 }

@@ -28,7 +28,7 @@ internal object SignalBus {
      * @param value The data payload associated with the signal emission
      */
     @Suppress("UNCHECKED_CAST")
-    fun <T> emit(signal: SignalHandle<T>, value: T) {
+    suspend fun <T> emit(signal: SignalHandle<T>, value: T) {
         // Get all reaction handles registered for this signal
         val reactions = registrations[signal] ?: return
 
@@ -37,7 +37,7 @@ internal object SignalBus {
             RuntimeScope.scope.launch {
                 try {
                     val typedReaction = reaction as ReactionHandle<T>
-                    typedReaction.handler(value)
+                    typedReaction.executeReaction(value)
                 } catch (e: Exception) {
                     // Log error but don't let it crash the system
                     System.err.println("Error in reaction '${reaction.name}' to signal '${signal.name}': ${e.message}")
