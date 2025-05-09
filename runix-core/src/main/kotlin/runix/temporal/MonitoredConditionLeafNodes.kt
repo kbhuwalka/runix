@@ -31,6 +31,7 @@ internal class BooleanLeaf(
         bindings += FlowBinding(
             key = key,
             retention = type.retention,
+            sourceFlow = flow,
             tracker = BooleanTracker(flow, type.retention)
         )
         return type.compileExpression(key, TrackerRegistry)
@@ -49,6 +50,7 @@ internal class NumericLeaf(
         bindings += FlowBinding(
             key = key,
             retention = type.retention,
+            sourceFlow = flow,
             tracker = NumericTracker(flow, type.retention)
         )
         return type.compileExpression(key, TrackerRegistry)
@@ -67,6 +69,7 @@ internal class CategoricalLeaf<T>(
         bindings += FlowBinding(
             key = key,
             retention = type.retention,
+            sourceFlow = flow,
             tracker = CategoricalTracker(flow, type.retention)
         )
         return type.compileExpression(key, TrackerRegistry)
