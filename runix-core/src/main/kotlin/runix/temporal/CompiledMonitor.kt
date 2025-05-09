@@ -31,7 +31,7 @@ internal data class CompiledMonitor(
         started = true
 
         for (binding in bindings) {
-            val tracker = binding.createTracker(onUpdate)
+            val tracker = binding.tracker
             tracker.registerWith(binding.key)
         }
     }

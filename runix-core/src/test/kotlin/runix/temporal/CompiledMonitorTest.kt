@@ -31,10 +31,7 @@ class CompiledMonitorTest {
         val binding = FlowBinding(
             key = "tracker-key",
             retention = Duration.ZERO,
-            createTracker = {
-                tracker.lastUpdateCallback = it
-                tracker
-            }
+            tracker = tracker
         )
 
         val monitor = CompiledMonitor(
@@ -49,39 +46,13 @@ class CompiledMonitorTest {
     }
 
     @Test
-    fun `start passes onUpdate callback to tracker`() {
-        val tracker = FakeTracker()
-        val callbackLog = mutableListOf<String>()
-
-        val binding = FlowBinding(
-            key = "update-test",
-            retention = Duration.ZERO,
-            createTracker = {
-                tracker.lastUpdateCallback = it
-                tracker
-            }
-        )
-
-        val monitor = CompiledMonitor("update-monitor", { ConditionEval.True }, listOf(binding))
-
-        monitor.start { callbackLog += "onUpdate called" }
-        tracker.lastUpdateCallback?.invoke()
-
-        assertEquals(listOf("onUpdate called"), callbackLog)
-    }
-
-    @Test
-    fun `start only runs tracker creation once`() {
-        var createTrackerCount = 0
+    fun `start registers trackers`() {
         val tracker = FakeTracker()
 
         val binding = FlowBinding(
             key = "start-once",
             retention = Duration.ZERO,
-            createTracker = {
-                createTrackerCount++
-                tracker
-            }
+            tracker = tracker
         )
 
         val monitor = CompiledMonitor("once-monitor", { ConditionEval.True }, listOf(binding))
@@ -90,7 +61,7 @@ class CompiledMonitorTest {
         monitor.start {}
         monitor.start {}
 
-        assertEquals(1, createTrackerCount)
+        assertEquals("start-once", tracker.registeredKey)
     }
 
     @Test
@@ -110,7 +81,7 @@ class CompiledMonitorTest {
         val binding = FlowBinding(
             key = "stop-key",
             retention = Duration.ZERO,
-            createTracker = { tracker }
+            tracker = tracker
         )
 
         val monitor = CompiledMonitor("stop-monitor", { ConditionEval.True }, listOf(binding))
