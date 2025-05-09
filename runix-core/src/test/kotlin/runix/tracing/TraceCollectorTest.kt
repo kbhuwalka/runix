@@ -17,7 +17,7 @@ class TraceCollectorTests {
     @Test
     fun `emitting events adds them to buffer`() {
         val event = ActionStarted(
-            componentPath = "ModuleA/Action1",
+            parentId = UUID.randomUUID(),
             actionName = "StartCleaning"
         )
 
@@ -31,16 +31,16 @@ class TraceCollectorTests {
     @Test
     fun `multiple events are recorded in order`() {
         val events = listOf(
-            ActionStarted(componentPath = "ModuleX/Action1", actionName = "First"),
+            ActionStarted(actionName = "First", parentId = UUID.randomUUID(),),
             ActionSucceeded(
                 traceId = UUID.randomUUID(),
-                componentPath = "ModuleX/Action1",
+                parentId = UUID.randomUUID(),
                 result = "ok",
                 durationMillis = 123
             ),
             ActionFailed(
                 traceId = UUID.randomUUID(),
-                componentPath = "ModuleX/Action2",
+                parentId = UUID.randomUUID(),
                 reason = "HardwareError",
                 durationMillis = 320
             )
@@ -64,7 +64,7 @@ class TraceCollectorTests {
 
         val event = ActionCancelled(
             traceId = UUID.randomUUID(),
-            componentPath = "ModuleY/Action1",
+            parentId = UUID.randomUUID(),
             reason = "Aborted"
         )
 
@@ -79,20 +79,19 @@ class TraceCollectorTests {
         repeat(6000) { i ->
             TraceCollector.emit(
                 ActionStarted(
-                    componentPath = "M$i",
-                    actionName = "A$i"
+                    actionName = "A$i",
+                    parentId = UUID.randomUUID()
                 )
             )
         }
 
         val buffered = TraceCollector.getBufferedEvents()
         assertTrue(buffered.size <= 5000)
-        assertTrue(buffered.first().componentPath.contains("M1000"))
     }
 
     @Test
     fun `reset clears buffer and reporters`() {
-        val dummyEvent = ActionStarted(componentPath = "Z/ActionZ", actionName = "Zed")
+        val dummyEvent = ActionStarted(actionName = "Zed", parentId = UUID.randomUUID())
         val dummyReporter = TraceReporter { }
 
         TraceCollector.emit(dummyEvent)

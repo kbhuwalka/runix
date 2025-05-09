@@ -10,5 +10,5 @@ import java.util.UUID
 sealed interface TraceEvent {
     val timestamp: Instant
     val traceId: UUID
-    val componentPath: String
+    val parentId: UUID?
 }

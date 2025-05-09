@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import runix.tracing.events.*
 import runix.tracing.reporters.ConsoleTraceReporter
+import java.util.UUID
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TraceSystemDemoTest {
@@ -25,13 +26,13 @@ class TraceSystemDemoTest {
 
         val start = ActionStarted(
             traceId = context.traceId,
-            componentPath = "ModuleX/ActionA",
+            parentId = UUID.randomUUID(),
             actionName = "MoveArm"
         )
 
         val end = ActionSucceeded(
             traceId = context.traceId,
-            componentPath = "ModuleX/ActionA",
+            parentId = UUID.randomUUID(),
             result = "OK",
             durationMillis = 780
         )
@@ -56,20 +57,20 @@ class TraceSystemDemoTest {
 
         val monitor = MonitorTriggered(
             traceId = parent.traceId,
-            componentPath = "Safety/CollisionMonitor",
+            parentId = UUID.randomUUID(),
             monitorName = "NoObstacle",
             satisfiedConditions = listOf("LidarClear")
         )
 
         val signal = SignalEmitted(
             traceId = parent.traceId,
-            componentPath = "Safety/CollisionMonitor",
+            parentId = UUID.randomUUID(),
             signalName = "ClearToProceed"
         )
 
         val reaction = ReactionTriggered(
             traceId = child.traceId,
-            componentPath = "Nav/StartMove",
+            parentId = UUID.randomUUID(),
             reactionName = "StartMoving"
         )
 

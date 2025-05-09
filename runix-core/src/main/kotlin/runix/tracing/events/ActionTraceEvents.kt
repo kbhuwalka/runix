@@ -9,7 +9,7 @@ import java.util.UUID
 data class ActionStarted(
     override val timestamp: Instant = Instant.now(),
     override val traceId: UUID = UUID.randomUUID(),
-    override val componentPath: String,
+    override val parentId: UUID?,
     val actionName: String
 ) : TraceEvent
 
@@ -19,7 +19,7 @@ data class ActionStarted(
 data class ActionSucceeded(
     override val timestamp: Instant = Instant.now(),
     override val traceId: UUID,
-    override val componentPath: String,
+    override val parentId: UUID?,
     val result: String,
     val durationMillis: Long
 ) : TraceEvent
@@ -30,7 +30,7 @@ data class ActionSucceeded(
 data class ActionFailed(
     override val timestamp: Instant = Instant.now(),
     override val traceId: UUID,
-    override val componentPath: String,
+    override val parentId: UUID?,
     val reason: String,
     val durationMillis: Long
 ) : TraceEvent
@@ -41,7 +41,7 @@ data class ActionFailed(
 data class ActionCancelled(
     override val timestamp: Instant = Instant.now(),
     override val traceId: UUID,
-    override val componentPath: String,
+    override val parentId: UUID?,
     val reason: String
 ) : TraceEvent
 
@@ -51,17 +51,6 @@ data class ActionCancelled(
 data class ActionTimedOut(
     override val timestamp: Instant = Instant.now(),
     override val traceId: UUID,
-    override val componentPath: String,
+    override val parentId: UUID?,
     val timeoutMillis: Long
-) : TraceEvent
-
-/**
- * Emitted when an Action is aborted or blocked due to a conflict with another running or queued action.
- */
-data class ActionConflictDetected(
-    override val timestamp: Instant = Instant.now(),
-    override val traceId: UUID,
-    override val componentPath: String,
-    val conflictingActionName: String,
-    val resolutionStrategy: String
 ) : TraceEvent
