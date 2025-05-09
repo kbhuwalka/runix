@@ -39,7 +39,7 @@ class BaseTrackerTest {
         flow: MutableStateFlow<T>,
         retention: Duration,
         scope: CoroutineScope
-    ) : BaseTracker<T>(flow, retention, scope, onUpdate = {}) {
+    ) : BaseTracker<T>(flow, retention, scope) {
         fun entries() = history.entries().toList()
         override fun registerWith(key: String) {}
     }

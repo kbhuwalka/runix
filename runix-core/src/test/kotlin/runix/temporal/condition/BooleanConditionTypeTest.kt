@@ -43,7 +43,7 @@ class BooleanConditionTypeTest {
     @Test
     fun `IsTrue returns True when flow is true`() = runTest(scheduler) {
         flow.value = true
-        val tracker = BooleanTracker(flow, retention = 0.seconds, onUpdate = {})
+        val tracker = BooleanTracker(flow, retention = 0.seconds)
         val expr = IsTrue().compileExpression("test", TestTrackerProvider(tracker))
         assertEquals(ConditionEval.True, expr())
 
@@ -53,7 +53,7 @@ class BooleanConditionTypeTest {
     @Test
     fun `IsTrue returns False when flow is false`() = runTest(scheduler) {
         flow.value = false
-        val tracker = BooleanTracker(flow, 0.seconds, onUpdate = {})
+        val tracker = BooleanTracker(flow, 0.seconds)
         val expr = IsTrue().compileExpression("test", TestTrackerProvider(tracker))
         assertEquals(ConditionEval.False, expr())
 
@@ -62,7 +62,7 @@ class BooleanConditionTypeTest {
 
     @Test
     fun `HasPersistedTrue returns Delayed until retention satisfied`() = runTest(scheduler) {
-        val tracker = BooleanTracker(flow, retention = 5.seconds, onUpdate = {})
+        val tracker = BooleanTracker(flow, retention = 5.seconds)
         flow.value = true
         advanceUntilIdle()
 
@@ -78,7 +78,7 @@ class BooleanConditionTypeTest {
 
     @Test
     fun `WasTrueFor returns True if true held in past`() = runTest(scheduler) {
-        val tracker = BooleanTracker(flow, 10.seconds, onUpdate = {})
+        val tracker = BooleanTracker(flow, 10.seconds)
         val expr = WasTrueFor(forDuration = 3.seconds, inLast = 10.seconds)
             .compileExpression("test", TestTrackerProvider(tracker))
 
@@ -95,7 +95,7 @@ class BooleanConditionTypeTest {
 
     @Test
     fun `WasEverTrue returns True if signal was ever true`() = runTest(scheduler) {
-        val tracker = BooleanTracker(flow, 10.seconds, onUpdate = {})
+        val tracker = BooleanTracker(flow, 10.seconds)
         val expr = WasEverTrue(inLast = 10.seconds)
             .compileExpression("test", TestTrackerProvider(tracker))
 
@@ -112,7 +112,7 @@ class BooleanConditionTypeTest {
 
     @Test
     fun `WasEverTrue returns False if signal was never true`() = runTest(scheduler) {
-        val tracker = BooleanTracker(flow, 10.seconds, onUpdate = {})
+        val tracker = BooleanTracker(flow, 10.seconds)
         val expr = WasEverTrue(inLast = 10.seconds)
             .compileExpression("test", TestTrackerProvider(tracker))
 
@@ -126,7 +126,7 @@ class BooleanConditionTypeTest {
     fun `HasFluctuated returns True after signal changes`() = runTest(scheduler) {
         println("Now: ${Time.markNow()}")
         val flow = MutableStateFlow(false)
-        val tracker = BooleanTracker(flow, 10.seconds, onUpdate = {})
+        val tracker = BooleanTracker(flow, 10.seconds)
         val expr = HasFluctuated(inLast = 10.seconds)
             .compileExpression("test", TestTrackerProvider(tracker))
 
@@ -145,7 +145,7 @@ class BooleanConditionTypeTest {
 
     @Test
     fun `HasFluctuated returns False when signal never changes`() = runTest(scheduler) {
-        val tracker = BooleanTracker(flow, 10.seconds, onUpdate = {})
+        val tracker = BooleanTracker(flow, 10.seconds)
         val expr = HasFluctuated(inLast = 10.seconds)
             .compileExpression("test", TestTrackerProvider(tracker))
 

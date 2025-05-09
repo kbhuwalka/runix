@@ -18,8 +18,7 @@ class CompiledMonitorTest {
     ) : BaseTracker<Unit>(
         flow = MutableStateFlow<Unit>(Unit),
         retention = Duration.ZERO,
-        scope = CoroutineScope(StandardTestDispatcher()),
-        onUpdate = {}
+        scope = CoroutineScope(StandardTestDispatcher())
     ) {
         override fun registerWith(key: String) {
             registeredKey = key

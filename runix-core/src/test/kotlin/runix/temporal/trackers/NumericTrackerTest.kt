@@ -36,7 +36,7 @@ class NumericTrackerTest {
     @Test
     fun `evaluateLatestPersisted returns True when value held long enough`() = runTest(scheduler) {
         val flow = MutableStateFlow(5.0)
-        val tracker = NumericTracker(flow, 10.seconds, this) {}
+        val tracker = NumericTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         advanceTimeBy(5.seconds)
@@ -49,7 +49,7 @@ class NumericTrackerTest {
     @Test
     fun `evaluateLatestPersisted returns Delayed when dwell time not yet satisfied`() = runTest(scheduler) {
         val flow = MutableStateFlow(6.0)
-        val tracker = NumericTracker(flow, 10.seconds, this) {}
+        val tracker = NumericTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         advanceTimeBy(2.seconds)
@@ -62,7 +62,7 @@ class NumericTrackerTest {
     @Test
     fun `evaluateLatestPersisted returns False when predicate does not match`() = runTest(scheduler) {
         val flow = MutableStateFlow(2.0)
-        val tracker = NumericTracker(flow, 10.seconds, this) {}
+        val tracker = NumericTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         val result = tracker.evaluateLatestPersisted({ it > 5.0 }, 1.seconds)
@@ -76,7 +76,7 @@ class NumericTrackerTest {
     @Test
     fun `evaluatePastTransition returns True when value matched for required time`() = runTest(scheduler) {
         val flow = MutableStateFlow(2.0)
-        val tracker = NumericTracker(flow, 10.seconds, this) {}
+        val tracker = NumericTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         flow.value = 6.0
@@ -93,7 +93,7 @@ class NumericTrackerTest {
     @Test
     fun `evaluatePastTransition returns Delayed when value still holding but not long enough`() = runTest(scheduler) {
         val flow = MutableStateFlow(2.0)
-        val tracker = NumericTracker(flow, 10.seconds, this) {}
+        val tracker = NumericTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         flow.value = 7.0
@@ -108,7 +108,7 @@ class NumericTrackerTest {
     @Test
     fun `evaluatePastTransition returns False when predicate never matched`() = runTest(scheduler) {
         val flow = MutableStateFlow(1.0)
-        val tracker = NumericTracker(flow, 10.seconds, this) {}
+        val tracker = NumericTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         advanceTimeBy(5.seconds)
@@ -123,7 +123,7 @@ class NumericTrackerTest {
     @Test
     fun `evaluateTrend returns True for sustained increasing trend`() = runTest(scheduler) {
         val flow = MutableStateFlow(1.0)
-        val tracker = NumericTracker(flow, 10.seconds, this) {}
+        val tracker = NumericTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         flow.value = 2.0
@@ -141,7 +141,7 @@ class NumericTrackerTest {
     @Test
     fun `evaluateTrend returns Delayed when trend is holding but retention not satisfied`() = runTest(scheduler) {
         val flow = MutableStateFlow(1.0)
-        val tracker = NumericTracker(flow, 10.seconds, this) {}
+        val tracker = NumericTracker(flow, 10.seconds, this)
         advanceUntilIdle()
 
         flow.value = 2.0
