@@ -8,8 +8,15 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import runix.runtime.internal.RuntimeScope
+import runix.tracing.TraceCollector
+import runix.tracing.TraceContext
+import runix.tracing.TraceContextElement
+import runix.tracing.currentOrRoot
+import runix.tracing.events.ActionStarted
+import runix.utils.Logger
 import java.nio.channels.ClosedChannelException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -40,6 +47,7 @@ internal class ActionQueue<T>(
     private val enqueueIfRunning: Boolean,
     private val block: suspend (T) -> ActionResult
 ) {
+    private val logger = Logger.getLogger("Action($name)")
     private val channel = Channel<PendingActionExecution<T>>(Channel.UNLIMITED)
     private val runningJobs = ConcurrentHashMap<Job, PendingActionExecution<T>>()
 
@@ -63,12 +71,15 @@ internal class ActionQueue<T>(
 
     suspend fun submit(data: T): ActionResult {
         if (!allowConcurrent && !enqueueIfRunning && isRunningSynchronously.get()) {
+            logger.debug { "Action is configured to run synchronously and not enqueue, skipping item: $data" }
             return ActionResult.AlreadyRunning
         }
 
+        val trace = coroutineContext[TraceContextElement]?.context
+
         val deferred = CompletableDeferred<ActionResult>()
         try {
-            channel.send(PendingActionExecution(data, deferred))
+            channel.send(PendingActionExecution(data, deferred, traceContext = trace))
             maybeStartWorker()
             return deferred.await()
         } catch (e: ClosedChannelException) {
@@ -109,15 +120,20 @@ internal class ActionQueue<T>(
             while (true) {
                 // Try to get an item from the channel
                 val execution = channel.tryReceive().getOrNull() ?: break
+                val context = execution.traceContext?.let { TraceContextElement(it) } ?: coroutineContext
 
                 // Process the item
                 if (!allowConcurrent) {
                     isRunningSynchronously.set(true)
-                    processExecution(execution)
+                    logger.info { "Processing Action($name) synchronously with data: ${execution.data}" }
+                    withContext(context) {
+                        processExecution(execution)
+                    }
+
                     isRunningSynchronously.set(false)
                 } else {
                     // Launch concurrent execution
-                    RuntimeScope.scope.launch {
+                    RuntimeScope.scope.launch(context) {
                         processExecution(execution)
                     }
                 }
@@ -140,12 +156,23 @@ internal class ActionQueue<T>(
             // Track this job as running
             runningJobs[executionJob] = execution
 
+            val trace = TraceContext.currentOrRoot()
+            TraceCollector.emit(
+                ActionStarted(
+                    traceId = trace.traceId,
+                    parentId = trace.parentId,
+                    actionName = name
+                )
+            )
+
             // Set up timeout if needed
             val result = if (timeout.isFinite()) {
                 withTimeout(timeout) {
+                    logger.debug { "Executing Action($name) with timeout: $timeout and data: ${execution.data}" }
                     block(execution.data)
                 }
             } else {
+                logger.debug { "Executing Action($name) with data: ${execution.data}" }
                 block(execution.data)
             }
 
@@ -154,14 +181,17 @@ internal class ActionQueue<T>(
                 execution.deferred.complete(result)
             }
         } catch (_: TimeoutCancellationException) {
+            logger.warn { "Action($name) timed out after $timeout" }
             execution.deferred.complete(ActionResult.Timeout(timeout))
         } catch (e: CancellationException) {
+            logger.warn { "Action($name) was cancelled: ${e.message}" }
             // Handle cancellation by completing with a cancelled result
             if (!execution.deferred.isCompleted) {
                 execution.deferred.complete(ActionResult.Cancelled)
             }
             throw e
         } catch (e: Exception) {
+            logger.error { "Action($name) encountered error: ${e.message}" }
             // Handle other exceptions
             if (!execution.deferred.isCompleted) {
                 execution.deferred.complete(ActionResult.Failure(e))

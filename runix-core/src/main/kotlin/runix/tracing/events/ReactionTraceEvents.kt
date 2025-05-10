@@ -8,7 +8,7 @@ import java.util.UUID
  */
 data class ReactionTriggered(
     override val timestamp: Instant = Instant.now(),
-    override val traceId: UUID = UUID.randomUUID(),
+    override val traceId: UUID,
     override val parentId: UUID?,
     val reactionName: String
 ) : TraceEvent

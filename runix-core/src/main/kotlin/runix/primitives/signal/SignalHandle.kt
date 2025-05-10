@@ -1,6 +1,14 @@
 package runix.primitives.signal
 
+import kotlinx.coroutines.withContext
 import runix.primitives.signal.SignalBus
+import runix.tracing.TraceCollector
+import runix.tracing.TraceContext
+import runix.tracing.TraceContextElement
+import runix.tracing.currentOrRoot
+import runix.tracing.events.SignalEmitted
+import runix.utils.Logger
+import kotlin.math.sign
 
 /**
  * A strongly typed signal used for inter-module communication.
@@ -17,12 +25,25 @@ import runix.primitives.signal.SignalBus
 class SignalHandle<T> internal constructor(
     val name: String
 ) {
+    val logger = Logger.getLogger("$this")
     /**
      * Emits a new event of type [T].
      * Reactions or runtime handlers will be invoked accordingly.
      */
     suspend fun emit(value: T) {
-        SignalBus.emit(this, value)
+        logger.debug { "Emitting signal with value $value" }
+        val trace = TraceContext.currentOrRoot()
+        TraceCollector.emit(
+            SignalEmitted(
+                traceId = trace.traceId,
+                parentId = trace.parentId,
+                signalName = "$this"
+            )
+        )
+
+        withContext(TraceContextElement(trace)) {
+            SignalBus.emit(this@SignalHandle, value)
+        }
     }
 
     override fun toString(): String = "Signal($name)"

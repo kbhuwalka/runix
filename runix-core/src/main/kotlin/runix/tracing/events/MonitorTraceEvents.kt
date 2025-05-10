@@ -9,10 +9,9 @@ import java.util.UUID
  */
 data class MonitorTriggered(
     override val timestamp: Instant = Instant.now(),
-    override val traceId: UUID = UUID.randomUUID(),
+    override val traceId: UUID,
     override val parentId: UUID?,
-    val monitorName: String,
-    val satisfiedConditions: List<String>
+    val monitorName: String
 ) : TraceEvent
 
 /**
@@ -21,7 +20,7 @@ data class MonitorTriggered(
  */
 data class SignalEmitted(
     override val timestamp: Instant = Instant.now(),
-    override val traceId: UUID = UUID.randomUUID(),
+    override val traceId: UUID,
     override val parentId: UUID?,
     val signalName: String
 ) : TraceEvent

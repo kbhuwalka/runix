@@ -49,7 +49,6 @@ internal abstract class BaseTracker<T>(
         try {
             flow.collect { value ->
                 val mark = Time.markNow()
-                println("Adding: $value, at= $mark")
                 history.append(value, mark)
             }
         } catch (e: Throwable) {

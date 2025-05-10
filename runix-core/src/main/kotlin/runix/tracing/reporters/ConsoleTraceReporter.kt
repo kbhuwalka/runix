@@ -11,6 +11,6 @@ object ConsoleTraceReporter : TraceReporter {
     private val logger = LoggerFactory.getLogger("TraceReporter")
 
     override fun report(event: TraceEvent) {
-        logger.info("[{}] {} :: {}", event.timestamp, event.javaClass.simpleName, event)
+        logger.info(" {}", event)
     }
 }

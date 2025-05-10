@@ -4,6 +4,7 @@ import kotlinx.coroutines.runBlocking
 import runix.primitives.module.AppModule
 import runix.tracing.TraceCollector
 import runix.tracing.reporters.ConsoleTraceReporter
+import runix.utils.Logger
 import java.util.concurrent.CountDownLatch
 
 /**
@@ -37,6 +38,8 @@ import java.util.concurrent.CountDownLatch
  * ```
  */
 abstract class App : Activatable {
+    private val logger = Logger.getLogger<App>()
+
     protected val modules = mutableListOf<AppModule>()
     private var didStartBlock: (suspend () -> Unit)? = null
     private var willStopBlock: (suspend () -> Unit)? = null
@@ -114,6 +117,8 @@ abstract class App : Activatable {
     suspend fun startAsync() {
         // Only allow starting once
         check(!isRunning) { "App is already running" }
+        logger.info { "🟢Starting app..." }
+
         TraceCollector.registerReporter(ConsoleTraceReporter)
         
         // Initialize the runtime environment
@@ -152,6 +157,7 @@ abstract class App : Activatable {
      */
     suspend fun stopAsync() {
         if (!isRunning) return
+        logger.info { "🔴Stopping app..." }
 
         try {
             // Deactivate this app
@@ -203,7 +209,7 @@ abstract class App : Activatable {
      */
     internal fun setupShutdownHook() {
         Runtime.getRuntime().addShutdownHook(Thread {
-            println("\n🛑 Received shutdown signal")
+            logger.debug { "🛑Received shutdown signal, shutting down app..." }
             stop()
         })
     }

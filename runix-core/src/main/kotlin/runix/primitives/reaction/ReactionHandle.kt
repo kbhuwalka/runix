@@ -1,12 +1,20 @@
 package runix.primitives.reaction
 
+import kotlinx.coroutines.withContext
 import runix.runtime.Activatable
 import runix.primitives.module.AppModule
 import runix.primitives.signal.SignalHandle
 import runix.runtime.internal.Registerable
 import runix.runtime.internal.RegistrationGuard
 import runix.primitives.signal.SignalBus
+import runix.tracing.TraceCollector
+import runix.tracing.TraceContext
+import runix.tracing.TraceContextElement
+import runix.tracing.currentOrRoot
+import runix.tracing.events.ReactionTriggered
+import runix.utils.Logger
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.sign
 
 /**
  * Represents a declared reaction that responds to a specific signal.
@@ -17,6 +25,7 @@ class ReactionHandle<T> internal constructor(
     private val signal: SignalHandle<T>,
     internal val handler: suspend (T) -> Unit
 ) : Registerable, Activatable {
+    val logger = Logger.getLogger("$this")
     private val guard = RegistrationGuard()
     private var activated = AtomicBoolean(false)
 
@@ -34,6 +43,8 @@ class ReactionHandle<T> internal constructor(
     override suspend fun activate() {
         check(guard.isRegistered()) { "Reaction '$name' must be registered before activation." }
         if (activated.get()) return
+
+        logger.info("Registering reaction to $signal")
         
         SignalBus.register(signal, this)
         activated.set(true)
@@ -44,13 +55,26 @@ class ReactionHandle<T> internal constructor(
      */
     override suspend fun deactivate() {
         if (!activated.get()) return
-        
+        logger.info("Unregistering reaction from $signal")
+
         SignalBus.unregister(signal, this)
         activated.set(false)
     }
 
     internal suspend fun executeReaction(value: T) {
-        handler.invoke(value)
+        logger.debug{ "Executing reaction to signal $signal" }
+        val trace = TraceContext.currentOrRoot()
+        TraceCollector.emit(
+            ReactionTriggered(
+                traceId = trace.traceId,
+                parentId = trace.parentId,
+                reactionName = "$this"
+            )
+        )
+
+        withContext(TraceContextElement(trace)) {
+            handler.invoke(value)
+        }
     }
 
     override fun toString(): String = "Reaction($name)"

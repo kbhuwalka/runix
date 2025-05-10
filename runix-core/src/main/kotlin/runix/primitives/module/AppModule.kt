@@ -13,6 +13,7 @@ import runix.runtime.DefaultModuleScope
 import runix.runtime.ModuleScope
 import runix.runtime.internal.BehaviorRegistry
 import runix.runtime.internal.RuntimeScope
+import runix.utils.Logger
 
 /**
  * A behavioral unit in a Runix application that declares and owns:
@@ -57,6 +58,8 @@ import runix.runtime.internal.RuntimeScope
 abstract class AppModule(
     val name: String
 ) : Activatable {
+    val logger = Logger.getLogger("Module($name)")
+
     // Primitives collections
     private val monitors = mutableListOf<MonitorHandle>()
     private val reactions = mutableListOf<ReactionHandle<*>>()
@@ -118,6 +121,7 @@ abstract class AppModule(
      * Called internally by the runtime - do not call directly.
      */
     override suspend fun activate() {
+        logger.info { "Activating Module" }
         reactions.forEach { it.activate() }
         monitors.forEach { it.activate() }
         didStartBlock?.invoke()
@@ -128,6 +132,7 @@ abstract class AppModule(
      * Called internally by the runtime - do not call directly.
      */
     override suspend fun deactivate() {
+        logger.info { "Deactivating Module" }
         // Execute developer hook first - BLOCKING to ensure completion
         willStopBlock?.invoke()
         

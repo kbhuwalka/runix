@@ -58,8 +58,7 @@ class TraceSystemDemoTest {
         val monitor = MonitorTriggered(
             traceId = parent.traceId,
             parentId = UUID.randomUUID(),
-            monitorName = "NoObstacle",
-            satisfiedConditions = listOf("LidarClear")
+            monitorName = "NoObstacle"
         )
 
         val signal = SignalEmitted(

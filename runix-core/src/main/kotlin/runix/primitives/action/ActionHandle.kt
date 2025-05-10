@@ -1,8 +1,15 @@
 package runix.primitives.action
 
+import kotlinx.coroutines.withContext
 import runix.primitives.module.AppModule
 import runix.runtime.internal.Registerable
 import runix.runtime.internal.RegistrationGuard
+import runix.temporal.time.Time
+import runix.tracing.TraceCollector
+import runix.tracing.TraceContext
+import runix.tracing.TraceContextElement
+import runix.tracing.currentOrRoot
+import runix.tracing.events.ActionRequested
 import kotlin.time.Duration
 
 /**
@@ -54,7 +61,26 @@ class ActionHandle<T>(
      * for this action is active at a time unless explicitly allowed.
      */
     suspend fun run(data: T): ActionResult {
-        return queue.submit(data)
+        val requested = Time.markNow()
+        val actionRequestedTrace = TraceContext.currentOrRoot()
+        TraceCollector.emit(
+            ActionRequested(
+                traceId = actionRequestedTrace.traceId,
+                parentId = actionRequestedTrace.parentId,
+                actionName = name
+            )
+        )
+
+        val result =  withContext(TraceContextElement(actionRequestedTrace)) {
+            queue.submit(data)
+        }
+
+        val resultTrace = actionRequestedTrace.derive()
+        TraceCollector.emit(
+            result.toTraceEvent(resultTrace, name, requested.elapsedNow())
+        )
+
+        return result
     }
 
     fun cancel() {

@@ -1,5 +1,6 @@
 package runix.primitives.monitor
 
+import kotlinx.coroutines.withContext
 import runix.primitives.module.AppModule
 import runix.primitives.signal.SignalHandle
 import runix.runtime.Activatable
@@ -8,6 +9,15 @@ import runix.runtime.internal.RegistrationGuard
 import runix.temporal.CompiledMonitor
 import runix.temporal.MonitoredCondition
 import runix.temporal.condition.ConditionEval
+import runix.temporal.time.Time
+import runix.temporal.time.durationSince
+import runix.temporal.time.toInstant
+import runix.tracing.TraceCollector
+import runix.tracing.TraceContext
+import runix.tracing.TraceContextElement
+import runix.tracing.currentOrRoot
+import runix.tracing.events.MonitorTriggered
+import runix.utils.Logger
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -30,6 +40,7 @@ class MonitorHandle internal constructor(
     private val condition: MonitoredCondition,
     private val signal: SignalHandle<Unit>?
 ) : Registerable, Activatable {
+    val logger = Logger.getLogger("$this")
     private val guard = RegistrationGuard()
     private lateinit var compiled: CompiledMonitor
     internal var started = AtomicBoolean(false)
@@ -57,6 +68,7 @@ class MonitorHandle internal constructor(
 
         // Begin tracker observation and evaluation the pipeline
         compiled.start { dispatcher.requestEvaluate() }
+        logger.info("Started tracking flows")
     }
 
     /**
@@ -65,6 +77,8 @@ class MonitorHandle internal constructor(
     override suspend fun deactivate() {
         if (!started.get()) return
         compiled.stop()
+        logger.info("Stopped tracking flows")
+
         dispatcher.shutdown()
         started.set(false)
     }
@@ -77,12 +91,31 @@ class MonitorHandle internal constructor(
      */
     internal suspend fun evaluate() {
         val result = compiled.condition.invoke()
+        logger.debug { "Evaluated condition and result: $result" }
 
         dispatcher.cancelScheduled()
         when (result) {
-            is ConditionEval.True -> signal?.emit(Unit)
+            is ConditionEval.True -> {
+                val trace = TraceContext.currentOrRoot()
+                TraceCollector.emit(
+                    MonitorTriggered(
+                        traceId = trace.traceId,
+                        parentId = trace.parentId,
+                        monitorName = name
+                    )
+                )
+
+                withContext(TraceContextElement(trace)) {
+                    signal?.emit(Unit)
+                }
+            }
             is ConditionEval.False -> {} // no-op
-            is ConditionEval.Delayed -> dispatcher.scheduleEvaluateAt(result.nextCheckAt)
+            is ConditionEval.Delayed -> {
+                val scheduledTime = result.nextCheckAt
+                logger.debug { "Scheduling to re-check in: ${scheduledTime.durationSince(Time.markNow())}" }
+
+                dispatcher.scheduleEvaluateAt(result.nextCheckAt)
+            }
         }
     }
 

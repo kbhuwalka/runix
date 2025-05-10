@@ -3,7 +3,10 @@ package runix.primitives.signal
 import kotlinx.coroutines.launch
 import runix.primitives.reaction.ReactionHandle
 import runix.runtime.internal.RuntimeScope
+import runix.tracing.TraceContextElement
+import runix.utils.Logger
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.coroutines.coroutineContext
 
 /**
  * Internal message router for `SignalHandle` emissions.
@@ -15,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap
  * - Decoupled dispatch and handler registration
  */
 internal object SignalBus {
+    val logger = Logger.getLogger<SignalBus>()
     // Map of signals to sets of ReactionHandles
     private val registrations = ConcurrentHashMap<SignalHandle<*>, MutableSet<ReactionHandle<*>>>()
 
@@ -32,15 +36,23 @@ internal object SignalBus {
         // Get all reaction handles registered for this signal
         val reactions = registrations[signal] ?: return
 
+        val context = coroutineContext
+        val traceElemet = context[TraceContextElement]
+        val launchContext = if (traceElemet != null) {
+            context + traceElemet
+        } else {
+            context
+        }
+
         // Launch each reaction handler in the runtime scope with error handling
         reactions.forEach { reaction ->
-            RuntimeScope.scope.launch {
+            RuntimeScope.scope.launch(launchContext) {
                 try {
                     val typedReaction = reaction as ReactionHandle<T>
                     typedReaction.executeReaction(value)
                 } catch (e: Exception) {
                     // Log error but don't let it crash the system
-                    System.err.println("Error in reaction '${reaction.name}' to signal '${signal.name}': ${e.message}")
+                    logger.error{ "Error in $reaction to signal $signal: ${e.message}" }
                     e.printStackTrace()
                 }
             }

@@ -1,6 +1,7 @@
 package runix.primitives.action
 
 import kotlinx.coroutines.CompletableDeferred
+import runix.tracing.TraceContext
 
 /**
  * Internal representation of a pending action execution request.
@@ -19,5 +20,10 @@ internal data class PendingActionExecution<T>(
      * A deferred result that will be completed with the action's execution result.
      * This allows async tracking of the action's completion status.
      */
-    val deferred: CompletableDeferred<ActionResult>
-)
+    val deferred: CompletableDeferred<ActionResult>,
+    /**
+     * The trace context at the time of submission.
+     * This allows proper tracing across asynchronous boundaries.
+     */
+    val traceContext: TraceContext?
+    )

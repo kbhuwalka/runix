@@ -1,5 +1,14 @@
 package runix.primitives.action
 
+import runix.tracing.TraceContext
+import runix.tracing.events.ActionCancelled
+import runix.tracing.events.ActionFailed
+import runix.tracing.events.ActionRejectedAlreadyRunning
+import runix.tracing.events.ActionSucceeded
+import runix.tracing.events.ActionTimedOut
+import runix.tracing.events.ActionTraceEvent
+import kotlin.time.Duration
+
 /**
  * Represents the result of executing a Runix [Action].
  *
@@ -17,6 +26,20 @@ package runix.primitives.action
 sealed class ActionResult {
 
     /**
+     * Creates the appropriate TraceEvent based on this ActionResult type.
+     *
+     * @param traceContext The current trace context (provides traceId and parentId)
+     * @param actionName The name of the action
+     * @param duration The execution duration in milliseconds
+     * @return A TraceEvent corresponding to this result type
+     */
+    abstract fun toTraceEvent(
+        traceContext: TraceContext,
+        actionName: String,
+        duration: Duration
+    ): ActionTraceEvent
+
+    /**
      * Indicates the action was already running when a new request was made.
      *
      * This happens when:
@@ -24,7 +47,18 @@ sealed class ActionResult {
      * - A request is made while the action is already processing another request
      * - The action is configured to reject rather than queue additional requests
      */
-    object AlreadyRunning : ActionResult()
+    object AlreadyRunning : ActionResult() {
+        override fun toTraceEvent(
+            traceContext: TraceContext,
+            actionName: String,
+            duration: Duration
+        ): ActionTraceEvent =
+            ActionRejectedAlreadyRunning(
+                traceId = traceContext.traceId,
+                parentId = traceContext.parentId,
+                actionName = actionName
+            )
+    }
 
     /**
      * Indicates the action completed successfully.
@@ -32,7 +66,19 @@ sealed class ActionResult {
      * This is the expected normal outcome when an action completes its work
      * without errors or interruptions.
      */
-    object Success : ActionResult()
+    object Success : ActionResult() {
+        override fun toTraceEvent(
+            traceContext: TraceContext,
+            actionName: String,
+            duration: Duration
+        ): ActionTraceEvent =
+            ActionSucceeded(
+                traceId = traceContext.traceId,
+                parentId = traceContext.parentId,
+                actionName = actionName,
+                duration = duration.inWholeMilliseconds
+            )
+    }
 
     /**
      * Indicates the action was cancelled before completion.
@@ -42,21 +88,60 @@ sealed class ActionResult {
      * - The coroutine context was cancelled
      * - The action implementation threw a CancellationException
      */
-    object Cancelled : ActionResult()
+    object Cancelled : ActionResult() {
+        override fun toTraceEvent(
+            traceContext: TraceContext,
+            actionName: String,
+            duration: Duration
+        ): ActionTraceEvent =
+            ActionCancelled(
+                traceId = traceContext.traceId,
+                parentId = traceContext.parentId,
+                actionName = actionName,
+                duration = duration.inWholeMilliseconds
+            )
+    }
 
     /**
      * Indicates the action failed due to an uncaught exception.
      *
      * @property cause The underlying throwable that caused the failure
      */
-    data class Failure(val cause: Throwable) : ActionResult()
+    data class Failure(val cause: Throwable) : ActionResult() {
+        override fun toTraceEvent(
+            traceContext: TraceContext,
+            actionName: String,
+            duration: Duration
+        ): ActionTraceEvent =
+            ActionFailed(
+                traceId = traceContext.traceId,
+                parentId = traceContext.parentId,
+                actionName = actionName,
+                exceptionClass = cause::class.java.simpleName,
+                message = cause.message,
+                duration = duration.inWholeMilliseconds
+            )
+    }
 
     /**
      * Indicates the action did not complete within its allotted time.
      *
      * @property after The timeout duration that was exceeded
      */
-    data class Timeout(val after: kotlin.time.Duration) : ActionResult()
+    data class Timeout(val after: Duration) : ActionResult() {
+        override fun toTraceEvent(
+            traceContext: TraceContext,
+            actionName: String,
+            duration: Duration
+        ): ActionTraceEvent =
+            ActionTimedOut(
+                traceId = traceContext.traceId,
+                parentId = traceContext.parentId,
+                actionName = actionName,
+                timeoutDurationMillis = after.inWholeMilliseconds,
+                duration = duration.inWholeMilliseconds
+            )
+    }
 
     override fun toString(): String = when (this) {
         is AlreadyRunning -> "ActionResult.AlreadyRunning"
