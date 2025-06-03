@@ -1,12 +1,12 @@
 package runix.primitives.action
 
-import runix.tracing.TraceContext
 import runix.tracing.events.ActionCancelled
 import runix.tracing.events.ActionFailed
 import runix.tracing.events.ActionRejectedAlreadyRunning
 import runix.tracing.events.ActionSucceeded
 import runix.tracing.events.ActionTimedOut
 import runix.tracing.events.ActionTraceEvent
+import runix.tracing.events.TraceEvent
 import kotlin.time.Duration
 
 /**
@@ -28,13 +28,13 @@ sealed class ActionResult {
     /**
      * Creates the appropriate TraceEvent based on this ActionResult type.
      *
-     * @param traceContext The current trace context (provides traceId and parentId)
+     * @param previousEvent The previous event that caused this result
      * @param actionName The name of the action
      * @param duration The execution duration in milliseconds
      * @return A TraceEvent corresponding to this result type
      */
-    abstract fun toTraceEvent(
-        traceContext: TraceContext,
+    internal abstract fun toTraceEvent(
+        previousEvent: TraceEvent,
         actionName: String,
         duration: Duration
     ): ActionTraceEvent
@@ -49,13 +49,12 @@ sealed class ActionResult {
      */
     object AlreadyRunning : ActionResult() {
         override fun toTraceEvent(
-            traceContext: TraceContext,
+            previousEvent: TraceEvent,
             actionName: String,
             duration: Duration
         ): ActionTraceEvent =
             ActionRejectedAlreadyRunning(
-                traceId = traceContext.traceId,
-                parentId = traceContext.parentId,
+                parent = previousEvent,
                 actionName = actionName
             )
     }
@@ -68,13 +67,12 @@ sealed class ActionResult {
      */
     object Success : ActionResult() {
         override fun toTraceEvent(
-            traceContext: TraceContext,
+            previousEvent: TraceEvent,
             actionName: String,
             duration: Duration
         ): ActionTraceEvent =
             ActionSucceeded(
-                traceId = traceContext.traceId,
-                parentId = traceContext.parentId,
+                parent = previousEvent,
                 actionName = actionName,
                 duration = duration.inWholeMilliseconds
             )
@@ -85,18 +83,17 @@ sealed class ActionResult {
      *
      * This happens when:
      * - The action was explicitly cancelled
-     * - The coroutine context was cancelled
+     * - The coroutine previousEvent was cancelled
      * - The action implementation threw a CancellationException
      */
     object Cancelled : ActionResult() {
         override fun toTraceEvent(
-            traceContext: TraceContext,
+            previousEvent: TraceEvent,
             actionName: String,
             duration: Duration
         ): ActionTraceEvent =
             ActionCancelled(
-                traceId = traceContext.traceId,
-                parentId = traceContext.parentId,
+                parent = previousEvent,
                 actionName = actionName,
                 duration = duration.inWholeMilliseconds
             )
@@ -109,13 +106,12 @@ sealed class ActionResult {
      */
     data class Failure(val cause: Throwable) : ActionResult() {
         override fun toTraceEvent(
-            traceContext: TraceContext,
+            previousEvent: TraceEvent,
             actionName: String,
             duration: Duration
         ): ActionTraceEvent =
             ActionFailed(
-                traceId = traceContext.traceId,
-                parentId = traceContext.parentId,
+                parent = previousEvent,
                 actionName = actionName,
                 exceptionClass = cause::class.java.simpleName,
                 message = cause.message,
@@ -130,13 +126,12 @@ sealed class ActionResult {
      */
     data class Timeout(val after: Duration) : ActionResult() {
         override fun toTraceEvent(
-            traceContext: TraceContext,
+            previousEvent: TraceEvent,
             actionName: String,
             duration: Duration
         ): ActionTraceEvent =
             ActionTimedOut(
-                traceId = traceContext.traceId,
-                parentId = traceContext.parentId,
+                parent = previousEvent,
                 actionName = actionName,
                 timeoutDurationMillis = after.inWholeMilliseconds,
                 duration = duration.inWholeMilliseconds

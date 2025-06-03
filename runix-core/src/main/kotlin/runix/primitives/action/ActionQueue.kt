@@ -12,9 +12,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import runix.runtime.internal.RuntimeScope
 import runix.tracing.TraceCollector
-import runix.tracing.TraceContext
-import runix.tracing.TraceContextElement
-import runix.tracing.currentOrRoot
+import runix.tracing.TraceEventContextElement
 import runix.tracing.events.ActionStarted
 import runix.utils.Logger
 import java.nio.channels.ClosedChannelException
@@ -75,11 +73,11 @@ internal class ActionQueue<T>(
             return ActionResult.AlreadyRunning
         }
 
-        val trace = coroutineContext[TraceContextElement]?.context
+        val trace = coroutineContext[TraceEventContextElement]?.previousEvent
 
         val deferred = CompletableDeferred<ActionResult>()
         try {
-            channel.send(PendingActionExecution(data, deferred, traceContext = trace))
+            channel.send(PendingActionExecution(data, deferred, previousEvent = trace))
             maybeStartWorker()
             return deferred.await()
         } catch (e: ClosedChannelException) {
@@ -120,7 +118,7 @@ internal class ActionQueue<T>(
             while (true) {
                 // Try to get an item from the channel
                 val execution = channel.tryReceive().getOrNull() ?: break
-                val context = execution.traceContext?.let { TraceContextElement(it) } ?: coroutineContext
+                val context = execution.previousEvent?.let { TraceEventContextElement(it) } ?: coroutineContext
 
                 // Process the item
                 if (!allowConcurrent) {
@@ -156,11 +154,10 @@ internal class ActionQueue<T>(
             // Track this job as running
             runningJobs[executionJob] = execution
 
-            val trace = TraceContext.currentOrRoot()
+            val previousEvent = coroutineContext[TraceEventContextElement]?.previousEvent
             TraceCollector.emit(
                 ActionStarted(
-                    traceId = trace.traceId,
-                    parentId = trace.parentId,
+                    parent = previousEvent,
                     actionName = name
                 )
             )

@@ -11,14 +11,12 @@ import runix.temporal.MonitoredCondition
 import runix.temporal.condition.ConditionEval
 import runix.temporal.time.Time
 import runix.temporal.time.durationSince
-import runix.temporal.time.toInstant
 import runix.tracing.TraceCollector
-import runix.tracing.TraceContext
-import runix.tracing.TraceContextElement
-import runix.tracing.currentOrRoot
+import runix.tracing.TraceEventContextElement
 import runix.tracing.events.MonitorTriggered
 import runix.utils.Logger
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.coroutineContext
 
 /**
  * A declared monitor that observes a condition and optionally emits a signal.
@@ -96,16 +94,14 @@ class MonitorHandle internal constructor(
         dispatcher.cancelScheduled()
         when (result) {
             is ConditionEval.True -> {
-                val trace = TraceContext.currentOrRoot()
-                TraceCollector.emit(
-                    MonitorTriggered(
-                        traceId = trace.traceId,
-                        parentId = trace.parentId,
-                        monitorName = name
-                    )
+                val previousEvent = coroutineContext[TraceEventContextElement]?.previousEvent
+                val monitorTriggeredEvent = MonitorTriggered(
+                    parent = previousEvent,
+                    monitorName = name
                 )
+                TraceCollector.emit(monitorTriggeredEvent)
 
-                withContext(TraceContextElement(trace)) {
+                withContext(TraceEventContextElement(monitorTriggeredEvent)) {
                     signal?.emit(Unit)
                 }
             }

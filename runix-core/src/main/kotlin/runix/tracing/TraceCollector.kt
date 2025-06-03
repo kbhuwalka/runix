@@ -19,7 +19,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  *
  * This class avoids explicit locking by using concurrent data structures.
  */
-object TraceCollector {
+internal object TraceCollector {
 
     /** Maximum number of trace events retained in the in-memory buffer. */
     private const val MAX_BUFFER_SIZE = 5000

@@ -3,7 +3,7 @@ package runix.primitives.signal
 import kotlinx.coroutines.launch
 import runix.primitives.reaction.ReactionHandle
 import runix.runtime.internal.RuntimeScope
-import runix.tracing.TraceContextElement
+import runix.tracing.TraceEventContextElement
 import runix.utils.Logger
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.coroutineContext
@@ -37,9 +37,9 @@ internal object SignalBus {
         val reactions = registrations[signal] ?: return
 
         val context = coroutineContext
-        val traceElemet = context[TraceContextElement]
-        val launchContext = if (traceElemet != null) {
-            context + traceElemet
+        val traceElement = context[TraceEventContextElement]
+        val launchContext = if (traceElement != null) {
+            context + traceElement
         } else {
             context
         }

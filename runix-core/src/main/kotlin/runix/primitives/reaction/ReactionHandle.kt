@@ -1,20 +1,18 @@
 package runix.primitives.reaction
 
 import kotlinx.coroutines.withContext
-import runix.runtime.Activatable
 import runix.primitives.module.AppModule
+import runix.primitives.signal.SignalBus
 import runix.primitives.signal.SignalHandle
+import runix.runtime.Activatable
 import runix.runtime.internal.Registerable
 import runix.runtime.internal.RegistrationGuard
-import runix.primitives.signal.SignalBus
 import runix.tracing.TraceCollector
-import runix.tracing.TraceContext
-import runix.tracing.TraceContextElement
-import runix.tracing.currentOrRoot
+import runix.tracing.TraceEventContextElement
 import runix.tracing.events.ReactionTriggered
 import runix.utils.Logger
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.math.sign
+import kotlin.coroutines.coroutineContext
 
 /**
  * Represents a declared reaction that responds to a specific signal.
@@ -63,16 +61,14 @@ class ReactionHandle<T> internal constructor(
 
     internal suspend fun executeReaction(value: T) {
         logger.debug{ "Executing reaction to signal $signal" }
-        val trace = TraceContext.currentOrRoot()
-        TraceCollector.emit(
-            ReactionTriggered(
-                traceId = trace.traceId,
-                parentId = trace.parentId,
-                reactionName = "$this"
-            )
+        val previousEvent = coroutineContext[TraceEventContextElement]?.previousEvent
+        val reactionTriggeredEvent = ReactionTriggered(
+            parent = previousEvent,
+            reactionName = "$this"
         )
+        TraceCollector.emit(reactionTriggeredEvent)
 
-        withContext(TraceContextElement(trace)) {
+        withContext(TraceEventContextElement(reactionTriggeredEvent)) {
             handler.invoke(value)
         }
     }

@@ -6,10 +6,9 @@ import runix.runtime.internal.Registerable
 import runix.runtime.internal.RegistrationGuard
 import runix.temporal.time.Time
 import runix.tracing.TraceCollector
-import runix.tracing.TraceContext
-import runix.tracing.TraceContextElement
-import runix.tracing.currentOrRoot
+import runix.tracing.TraceEventContextElement
 import runix.tracing.events.ActionRequested
+import kotlin.coroutines.coroutineContext
 import kotlin.time.Duration
 
 /**
@@ -62,22 +61,19 @@ class ActionHandle<T>(
      */
     suspend fun run(data: T): ActionResult {
         val requested = Time.markNow()
-        val actionRequestedTrace = TraceContext.currentOrRoot()
-        TraceCollector.emit(
-            ActionRequested(
-                traceId = actionRequestedTrace.traceId,
-                parentId = actionRequestedTrace.parentId,
-                actionName = name
-            )
+        val previousEvent = coroutineContext[TraceEventContextElement]?.previousEvent
+        val actionRequestedEvent = ActionRequested(
+            parent = previousEvent,
+            actionName = name
         )
+        TraceCollector.emit(actionRequestedEvent)
 
-        val result =  withContext(TraceContextElement(actionRequestedTrace)) {
+        val result =  withContext(TraceEventContextElement(actionRequestedEvent)) {
             queue.submit(data)
         }
 
-        val resultTrace = actionRequestedTrace.derive()
         TraceCollector.emit(
-            result.toTraceEvent(resultTrace, name, requested.elapsedNow())
+            result.toTraceEvent(actionRequestedEvent, name, requested.elapsedNow())
         )
 
         return result
