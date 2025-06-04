@@ -12,7 +12,11 @@ internal data class MonitorTriggered(
     override val traceId: UUID = UUID.randomUUID(),
     override val parent: TraceEvent?,
     val monitorName: String
-) : TraceEvent
+) : TraceEvent {
+    override fun toString(): String {
+        return "${this.javaClass.simpleName}($monitorName): [${traceId.toString().take(8)}]"
+    }
+}
 
 /**
  * Emitted when a Monitor emits a signal due to its triggering condition.
@@ -23,4 +27,8 @@ internal data class SignalEmitted(
     override val traceId: UUID = UUID.randomUUID(),
     override val parent: TraceEvent?,
     val signalName: String
-) : TraceEvent
+) : TraceEvent {
+    override fun toString(): String {
+        return "${this.javaClass.simpleName}($signalName): [${traceId.toString().take(8)}]"
+    }
+}

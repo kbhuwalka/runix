@@ -10,6 +10,10 @@ import kotlin.time.Duration
  */
 internal sealed class ActionTraceEvent : TraceEvent {
     abstract val actionName: String
+
+    override fun toString(): String {
+        return "${this.javaClass.simpleName}($actionName): [${traceId.toString().take(8)}]"
+    }
 }
 
 /**

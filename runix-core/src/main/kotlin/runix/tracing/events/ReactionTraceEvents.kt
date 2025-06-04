@@ -11,4 +11,8 @@ internal data class ReactionTriggered(
     override val traceId: UUID = UUID.randomUUID(),
     override val parent: TraceEvent?,
     val reactionName: String
-) : TraceEvent
+) : TraceEvent {
+    override fun toString(): String {
+        return "${this.javaClass.simpleName}($reactionName): [${traceId.toString().take(8)}]"
+    }
+}
