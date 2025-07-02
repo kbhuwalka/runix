@@ -16,7 +16,7 @@ internal object ConsoleTraceReporter : TraceReporter {
 
     private fun buildChain(event: TraceEvent): String {
         // Start with the current event
-        val eventStr = "${event}(${event.traceId.toString().take(8)})"
+        val eventStr = "${event})"
 
         if (event.parent == null) {
             return eventStr

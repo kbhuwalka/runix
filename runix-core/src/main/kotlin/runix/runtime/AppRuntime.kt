@@ -19,7 +19,7 @@ internal object AppRuntime {
      * Initializes the runtime environment.
      * This sets up the coroutine scope and starts the scheduler.
      */
-    suspend fun initialize() {
+    fun initialize() {
         check(!isRunning) { "AppRuntime is already running." }
 
         // Create and install the RuntimeScope

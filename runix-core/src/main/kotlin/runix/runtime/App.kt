@@ -195,11 +195,12 @@ abstract class App : Activatable {
      */
     override suspend fun deactivate() {
         if (!isRunning) return
-        // Execute developer hook first
-        willStopBlock?.invoke()
-        
+
         // Then deactivate all modules in reverse order
         modules.asReversed().forEach { it.deactivate() }
+
+        // Execute developer hook last
+        willStopBlock?.invoke()
         isRunning = false
     }
     

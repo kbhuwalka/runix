@@ -10,10 +10,6 @@ import kotlin.time.Duration
  */
 internal sealed class ActionTraceEvent : TraceEvent {
     abstract val actionName: String
-
-    override fun toString(): String {
-        return "${this.javaClass.simpleName}($actionName): [${traceId.toString().take(8)}]"
-    }
 }
 
 /**
@@ -25,7 +21,11 @@ internal data class ActionRequested(
     override val traceId: UUID = UUID.randomUUID(),
     override val parent: TraceEvent?,
     override val actionName: String
-) : ActionTraceEvent()
+) : ActionTraceEvent() {
+    override fun toString(): String {
+        return "${this.javaClass.simpleName}($actionName): [${traceId.toString().take(8)}]"
+    }
+}
 
 
 /**
@@ -36,7 +36,11 @@ internal data class ActionStarted(
     override val traceId: UUID = UUID.randomUUID(),
     override val parent: TraceEvent?,
     override val actionName: String
-) : ActionTraceEvent()
+) : ActionTraceEvent() {
+    override fun toString(): String {
+        return "${this.javaClass.simpleName}($actionName, startedAt: $timestamp): [${traceId.toString().take(8)}]"
+    }
+}
 
 /**
  * Emitted when an Action completes successfully.
@@ -47,7 +51,11 @@ internal data class ActionSucceeded(
     override val parent: TraceEvent?,
     override val actionName: String,
     val duration:  Long
-) : ActionTraceEvent()
+) : ActionTraceEvent() {
+    override fun toString(): String {
+        return "${this.javaClass.simpleName}($actionName, endedAt: $timestamp, duration: $duration): [${traceId.toString().take(8)}]"
+    }
+}
 
 /**
  * Emitted when an Action fails due to an exception.
@@ -60,7 +68,11 @@ internal data class ActionFailed(
     val exceptionClass: String,
     val message: String?,
     val duration:  Long
-) : ActionTraceEvent()
+) : ActionTraceEvent() {
+    override fun toString(): String {
+        return "${this.javaClass.simpleName}($actionName, message: $message): [${traceId.toString().take(8)}]"
+    }
+}
 
 /**
  * Emitted when an Action is cancelled before completion.
@@ -71,7 +83,11 @@ internal data class ActionCancelled(
     override val parent: TraceEvent?,
     override val actionName: String,
     val duration:  Long
-) : ActionTraceEvent()
+) : ActionTraceEvent() {
+    override fun toString(): String {
+        return "${this.javaClass.simpleName}($actionName): [${traceId.toString().take(8)}]"
+    }
+}
 
 /**
  * Emitted when an Action exceeds its time limit and is forcefully terminated.
@@ -83,7 +99,11 @@ internal data class ActionTimedOut(
     override val actionName: String,
     val timeoutDurationMillis: Long,
     val duration:  Long
-) : ActionTraceEvent()
+) : ActionTraceEvent() {
+    override fun toString(): String {
+        return "${this.javaClass.simpleName}($actionName, timeout: $timeoutDurationMillis): [${traceId.toString().take(8)}]"
+    }
+}
 
 /**
  * Emitted when an Action cannot be executed because it's already running.
@@ -93,4 +113,8 @@ internal data class ActionRejectedAlreadyRunning(
     override val traceId: UUID = UUID.randomUUID(),
     override val parent: TraceEvent?,
     override val actionName: String
-) : ActionTraceEvent()
+) : ActionTraceEvent() {
+    override fun toString(): String {
+        return "${this.javaClass.simpleName}($actionName): [${traceId.toString().take(8)}]"
+    }
+}

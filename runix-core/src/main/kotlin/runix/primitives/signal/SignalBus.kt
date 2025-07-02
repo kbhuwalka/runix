@@ -1,5 +1,6 @@
 package runix.primitives.signal
 
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import runix.primitives.reaction.ReactionHandle
 import runix.runtime.internal.RuntimeScope
@@ -46,7 +47,7 @@ internal object SignalBus {
 
         // Launch each reaction handler in the runtime scope with error handling
         reactions.forEach { reaction ->
-            RuntimeScope.scope.launch(launchContext) {
+            RuntimeScope.scope.launch(launchContext.minusKey(Job)) {
                 try {
                     val typedReaction = reaction as ReactionHandle<T>
                     typedReaction.executeReaction(value)

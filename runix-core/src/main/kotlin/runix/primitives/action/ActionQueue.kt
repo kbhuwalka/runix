@@ -36,14 +36,14 @@ import kotlin.time.Duration
  * @param timeout Maximum time allowed for an action to complete before timing out
  * @param allowConcurrent Whether to allow concurrent processing of multiple items
  * @param enqueueIfRunning When not allowing concurrency, whether to queue additional items
- * @param block The action function that processes each item
+ * @param executionBlock The action function that processes each item
  */
 internal class ActionQueue<T>(
     private val name: String,
     private val timeout: Duration,
     private val allowConcurrent: Boolean,
     private val enqueueIfRunning: Boolean,
-    private val block: suspend (T) -> ActionResult
+    private val executionBlock: suspend (T) -> ActionResult
 ) {
     private val logger = Logger.getLogger("Action($name)")
     private val channel = Channel<PendingActionExecution<T>>(Channel.UNLIMITED)
@@ -73,11 +73,14 @@ internal class ActionQueue<T>(
             return ActionResult.AlreadyRunning
         }
 
-        val trace = coroutineContext[TraceEventContextElement]?.previousEvent
+        val previousEvent = coroutineContext[TraceEventContextElement]?.previousEvent
+        if (previousEvent == null) {
+            return ActionResult.Failure(IllegalStateException("Received request to submit action $name without a parent event."))
+        }
 
         val deferred = CompletableDeferred<ActionResult>()
         try {
-            channel.send(PendingActionExecution(data, deferred, previousEvent = trace))
+            channel.send(PendingActionExecution(data, deferred, previousEvent = previousEvent))
             maybeStartWorker()
             return deferred.await()
         } catch (e: ClosedChannelException) {
@@ -102,7 +105,7 @@ internal class ActionQueue<T>(
         lock.withLock {
             if (isWorkerActive()) return
 
-            workerJob = RuntimeScope.scope.launch {
+            workerJob = RuntimeScope.scope.launch(coroutineContext.minusKey(Job)) {
                 processQueue()
             }
         }
@@ -118,7 +121,7 @@ internal class ActionQueue<T>(
             while (true) {
                 // Try to get an item from the channel
                 val execution = channel.tryReceive().getOrNull() ?: break
-                val context = execution.previousEvent?.let { TraceEventContextElement(it) } ?: coroutineContext
+                val context = TraceEventContextElement(execution.previousEvent)
 
                 // Process the item
                 if (!allowConcurrent) {
@@ -131,7 +134,7 @@ internal class ActionQueue<T>(
                     isRunningSynchronously.set(false)
                 } else {
                     // Launch concurrent execution
-                    RuntimeScope.scope.launch(context) {
+                    RuntimeScope.scope.launch(context.minusKey(Job)) {
                         processExecution(execution)
                     }
                 }
@@ -155,27 +158,30 @@ internal class ActionQueue<T>(
             runningJobs[executionJob] = execution
 
             val previousEvent = coroutineContext[TraceEventContextElement]?.previousEvent
-            TraceCollector.emit(
-                ActionStarted(
-                    parent = previousEvent,
-                    actionName = name
-                )
+            val actionStartedEvent = ActionStarted(
+                parent = previousEvent,
+                actionName = name
             )
+            TraceCollector.emit(actionStartedEvent)
 
-            // Set up timeout if needed
-            val result = if (timeout.isFinite()) {
-                withTimeout(timeout) {
-                    logger.debug { "Executing Action($name) with timeout: $timeout and data: ${execution.data}" }
-                    block(execution.data)
+            withContext(TraceEventContextElement(actionStartedEvent)) {
+                // Set up timeout if needed
+                val result = if (timeout.isFinite()) {
+                    withTimeout(timeout) {
+                        logger.debug { "Executing Action($name) with timeout: $timeout and data: ${execution.data}" }
+                        executionBlock(execution.data)
+                    }
+                } else {
+                    logger.debug { "Executing Action($name) with data: ${execution.data}" }
+                    val result = executionBlock(execution.data)
+                    logger.debug { "Action($name) completed successfully" }
+                    result
                 }
-            } else {
-                logger.debug { "Executing Action($name) with data: ${execution.data}" }
-                block(execution.data)
-            }
 
-            // Complete with a result if not already completed (e.g., by cancellation)
-            if (!execution.deferred.isCompleted) {
-                execution.deferred.complete(result)
+                // Complete with a result if not already completed (e.g., by cancellation)
+                if (!execution.deferred.isCompleted) {
+                    execution.deferred.complete(result)
+                }
             }
         } catch (_: TimeoutCancellationException) {
             logger.warn { "Action($name) timed out after $timeout" }

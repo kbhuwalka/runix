@@ -25,5 +25,5 @@ internal data class PendingActionExecution<T>(
      * The trace previousEvent at the time of submission.
      * This allows proper tracing across asynchronous boundaries.
      */
-    val previousEvent: TraceEvent?
+    val previousEvent: TraceEvent
     )

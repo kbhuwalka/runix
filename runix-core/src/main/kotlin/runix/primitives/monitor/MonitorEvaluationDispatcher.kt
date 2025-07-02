@@ -17,7 +17,6 @@ import kotlin.time.TimeMark
  * Supports scheduling an evaluation at a future [TimeMark] and cancelling it.
  */
 class MonitorEvaluationDispatcher(
-    private val scope: CoroutineScope = RuntimeScope.scope,
     private val evaluate: suspend () -> Unit
 ) {
 
@@ -45,7 +44,7 @@ class MonitorEvaluationDispatcher(
     fun scheduleEvaluateAt(targetTime: ComparableTimeMark) {
         scheduledJob?.cancel()
 
-        scheduledJob = scope.launch {
+        scheduledJob = RuntimeScope.scope.launch {
             delayUntil(targetTime)
             requestEvaluate()
         }
@@ -70,7 +69,7 @@ class MonitorEvaluationDispatcher(
     }
 
     private fun runEvaluation() {
-        activeJob = scope.launch {
+        activeJob = RuntimeScope.scope.launch {
             try {
                 evaluate()
             } finally {

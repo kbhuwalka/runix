@@ -21,11 +21,11 @@
     </appender>
 
     <!-- Set default log level -->
-    <root level="INFO">
+    <root level="DEBUG">
         <appender-ref ref="CONSOLE" />
         <appender-ref ref="FILE" />
     </root>
 
     <!-- Custom log levels for specific packages -->
-    <logger name="runix" level="DEBUG" />
+<!--    <logger name="runix" level="DEBUG" />-->
 </configuration>
