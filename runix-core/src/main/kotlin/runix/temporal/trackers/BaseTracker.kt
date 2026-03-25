@@ -40,17 +40,15 @@ internal abstract class BaseTracker<T>(
             retention = retention
         )
 
-    private val job by lazy {
-        RuntimeScope.scope.launch {
-            try {
-                flow.collect { value ->
-                    val mark = Time.markNow()
-                    history.append(value, mark)
-                }
-            } catch (e: Throwable) {
-                // If the flow itself throws, rethrow or optionally trace/log here.
-                throw e
+    private val job: Job = RuntimeScope.scope.launch {
+        try {
+            flow.collect { value ->
+                val mark = Time.markNow()
+                history.append(value, mark)
             }
+        } catch (e: Throwable) {
+            // If the flow itself throws, rethrow or optionally trace/log here.
+            throw e
         }
     }
 
@@ -58,7 +56,7 @@ internal abstract class BaseTracker<T>(
      * Stops tracking this flow - cancels the collector and no further events will be recorded
      */
     internal open fun stop() {
-        job?.cancel()
+        job.cancel()
     }
 
     /**

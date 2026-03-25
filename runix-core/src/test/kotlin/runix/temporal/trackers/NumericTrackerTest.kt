@@ -3,9 +3,11 @@ package runix.temporal.trackers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import runix.runtime.internal.RuntimeScope
 import runix.temporal.condition.ConditionEval
 import runix.temporal.time.TestSchedulerTimeProvider
 import runix.temporal.time.Time
@@ -19,15 +21,18 @@ import kotlin.time.Duration.Companion.seconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class NumericTrackerTest {
     private val scheduler = TestCoroutineScheduler()
+    private val testScope = TestScope(scheduler)
     private val provider = TestSchedulerTimeProvider(scheduler)
 
     @BeforeTest
     fun setup() {
         Time.setProvider(provider)
+        RuntimeScope.install(testScope)
     }
 
     @AfterTest
     fun tearDown() {
+        RuntimeScope.clear()
         Time.resetToRealTime()
     }
 
@@ -36,7 +41,7 @@ class NumericTrackerTest {
     @Test
     fun `evaluateLatestPersisted returns True when value held long enough`() = runTest(scheduler) {
         val flow = MutableStateFlow(5.0)
-        val tracker = NumericTracker(flow, 10.seconds, this)
+        val tracker = NumericTracker(flow, 10.seconds)
         advanceUntilIdle()
 
         advanceTimeBy(5.seconds)
@@ -49,7 +54,7 @@ class NumericTrackerTest {
     @Test
     fun `evaluateLatestPersisted returns Delayed when dwell time not yet satisfied`() = runTest(scheduler) {
         val flow = MutableStateFlow(6.0)
-        val tracker = NumericTracker(flow, 10.seconds, this)
+        val tracker = NumericTracker(flow, 10.seconds)
         advanceUntilIdle()
 
         advanceTimeBy(2.seconds)
@@ -62,7 +67,7 @@ class NumericTrackerTest {
     @Test
     fun `evaluateLatestPersisted returns False when predicate does not match`() = runTest(scheduler) {
         val flow = MutableStateFlow(2.0)
-        val tracker = NumericTracker(flow, 10.seconds, this)
+        val tracker = NumericTracker(flow, 10.seconds)
         advanceUntilIdle()
 
         val result = tracker.evaluateLatestPersisted({ it > 5.0 }, 1.seconds)
@@ -76,7 +81,7 @@ class NumericTrackerTest {
     @Test
     fun `evaluatePastTransition returns True when value matched for required time`() = runTest(scheduler) {
         val flow = MutableStateFlow(2.0)
-        val tracker = NumericTracker(flow, 10.seconds, this)
+        val tracker = NumericTracker(flow, 10.seconds)
         advanceUntilIdle()
 
         flow.value = 6.0
@@ -93,7 +98,7 @@ class NumericTrackerTest {
     @Test
     fun `evaluatePastTransition returns Delayed when value still holding but not long enough`() = runTest(scheduler) {
         val flow = MutableStateFlow(2.0)
-        val tracker = NumericTracker(flow, 10.seconds, this)
+        val tracker = NumericTracker(flow, 10.seconds)
         advanceUntilIdle()
 
         flow.value = 7.0
@@ -108,7 +113,7 @@ class NumericTrackerTest {
     @Test
     fun `evaluatePastTransition returns False when predicate never matched`() = runTest(scheduler) {
         val flow = MutableStateFlow(1.0)
-        val tracker = NumericTracker(flow, 10.seconds, this)
+        val tracker = NumericTracker(flow, 10.seconds)
         advanceUntilIdle()
 
         advanceTimeBy(5.seconds)
@@ -123,7 +128,7 @@ class NumericTrackerTest {
     @Test
     fun `evaluateTrend returns True for sustained increasing trend`() = runTest(scheduler) {
         val flow = MutableStateFlow(1.0)
-        val tracker = NumericTracker(flow, 10.seconds, this)
+        val tracker = NumericTracker(flow, 10.seconds)
         advanceUntilIdle()
 
         flow.value = 2.0
@@ -141,7 +146,7 @@ class NumericTrackerTest {
     @Test
     fun `evaluateTrend returns Delayed when trend is holding but retention not satisfied`() = runTest(scheduler) {
         val flow = MutableStateFlow(1.0)
-        val tracker = NumericTracker(flow, 10.seconds, this)
+        val tracker = NumericTracker(flow, 10.seconds)
         advanceUntilIdle()
 
         flow.value = 2.0

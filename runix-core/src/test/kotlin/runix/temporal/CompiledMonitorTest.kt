@@ -42,7 +42,7 @@ class CompiledMonitorTest {
     private inner class TestTracker<T>(
         val sourceFlow: StateFlow<T>,
         val retention: Duration = Duration.ZERO
-    ) : BaseTracker<T>(sourceFlow, retention, testScope) {
+    ) : BaseTracker<T>(sourceFlow, retention) {
         var registeredKey: String? = null
         
         override fun registerWith(key: String) {
