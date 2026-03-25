@@ -17,8 +17,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -44,7 +42,7 @@ class MonitorEvaluationDispatcherTest {
     @Test
     fun `requestEvaluate runs evaluation immediately if no active job`() = runTest(scheduler) {
         val evaluationCount = AtomicInteger(0)
-        val dispatcher = MonitorEvaluationDispatcher(this) {
+        val dispatcher = MonitorEvaluationDispatcher {
             evaluationCount.incrementAndGet()
         }
 
@@ -60,7 +58,7 @@ class MonitorEvaluationDispatcherTest {
         val evaluationRequested = AtomicBoolean(false)
         
         // Create a dispatcher with a test hook
-        val dispatcher = MonitorEvaluationDispatcher(this) {
+        val dispatcher = MonitorEvaluationDispatcher {
             val count = evaluationCount.incrementAndGet()
             if (count == 1) {
                 // Signal for our test to make external requests
@@ -91,7 +89,7 @@ class MonitorEvaluationDispatcherTest {
     @Test
     fun `scheduleEvaluateAt runs evaluation at specified time`() = runTest(scheduler) {
         val evaluationCount = AtomicInteger(0)
-        val dispatcher = MonitorEvaluationDispatcher(this) {
+        val dispatcher = MonitorEvaluationDispatcher {
             evaluationCount.incrementAndGet()
         }
 
@@ -115,7 +113,7 @@ class MonitorEvaluationDispatcherTest {
     @Test
     fun `scheduleEvaluateAt cancels previous scheduled evaluation`() = runTest(scheduler) {
         val evaluationCount = AtomicInteger(0)
-        val dispatcher = MonitorEvaluationDispatcher(this) {
+        val dispatcher = MonitorEvaluationDispatcher {
             evaluationCount.incrementAndGet()
         }
 
@@ -141,7 +139,7 @@ class MonitorEvaluationDispatcherTest {
     @Test
     fun `cancelScheduled cancels upcoming evaluation`() = runTest(scheduler) {
         val evaluationCount = AtomicInteger(0)
-        val dispatcher = MonitorEvaluationDispatcher(this) {
+        val dispatcher = MonitorEvaluationDispatcher {
             evaluationCount.incrementAndGet()
         }
 
@@ -164,7 +162,7 @@ class MonitorEvaluationDispatcherTest {
         val runningEvaluation = AtomicInteger(0)
         
         // Create a dispatcher with a slow-running evaluation
-        val dispatcher = MonitorEvaluationDispatcher(this) {
+        val dispatcher = MonitorEvaluationDispatcher {
             runningEvaluation.incrementAndGet()
             try {
                 delay(1000) // Long-running task
@@ -195,68 +193,20 @@ class MonitorEvaluationDispatcherTest {
     }
 
     @Test
-    fun `activeJob is null after evaluation completes`() = runTest(scheduler) {
-        val dispatcher = MonitorEvaluationDispatcher(this) {
-            // Simple evaluation
-            delay(10)
+    fun `dispatcher processes new requests after becoming idle`() = runTest(scheduler) {
+        val evaluationCount = AtomicInteger(0)
+        val dispatcher = MonitorEvaluationDispatcher {
+            evaluationCount.incrementAndGet()
         }
 
-        // Use reflection to access the private activeJob field
-        val activeJobField = MonitorEvaluationDispatcher::class.java.getDeclaredField("activeJob")
-        activeJobField.isAccessible = true
-        
-        // Initially no active job
-        assertNull(activeJobField.get(dispatcher), "Initially no active job")
-        
-        // Request evaluation
+        // First batch
         dispatcher.requestEvaluate()
-        
-        // Give time for the job to be created and started
-        advanceTimeBy(1)
-        assertNotNull(activeJobField.get(dispatcher), "Job should be active during evaluation")
-        
-        // After evaluation completes
         advanceUntilIdle()
-        assertNull(activeJobField.get(dispatcher), "Job should be null after completion")
-    }
+        assertEquals(1, evaluationCount.get(), "First request should run")
 
-    @Test
-    fun `pending flag is reset after processing pending evaluation`() = runTest(scheduler) {
-        // Use reflection to access the private pending field
-        val evaluationStarted = AtomicBoolean(false)
-        val evaluationCompleted = AtomicBoolean(false)
-        
-        val dispatcher = MonitorEvaluationDispatcher(this) {
-            evaluationStarted.set(true)
-            delay(10) // Some work time
-            evaluationCompleted.set(true)
-        }
-        
-        val pendingField = MonitorEvaluationDispatcher::class.java.getDeclaredField("pending")
-        pendingField.isAccessible = true
-        val pending = pendingField.get(dispatcher) as AtomicBoolean
-        
-        // Initially not pending
-        assertFalse(pending.get(), "Initially not pending")
-        
-        // Start first evaluation
+        // Second batch after worker has gone idle
         dispatcher.requestEvaluate()
-        
-        // Advance a bit to let the first evaluation start
-        advanceTimeBy(5)
-        assertTrue(evaluationStarted.get(), "First evaluation should have started")
-        
-        // Request another evaluation while first is running
-        dispatcher.requestEvaluate()
-        
-        // Pending flag should be set
-        assertTrue(pending.get(), "Should be pending during first evaluation")
-        
-        // Complete both evaluations
         advanceUntilIdle()
-        
-        // Pending flag should be reset
-        assertFalse(pending.get(), "Pending flag should be reset after processing")
-        assertTrue(evaluationCompleted.get(), "Evaluations should have completed")
+        assertEquals(2, evaluationCount.get(), "Request after idle should restart worker and run")
     }
 }

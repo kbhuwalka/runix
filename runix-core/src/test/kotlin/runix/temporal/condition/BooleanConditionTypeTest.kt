@@ -124,7 +124,6 @@ class BooleanConditionTypeTest {
 
     @Test
     fun `HasFluctuated returns True after signal changes`() = runTest(scheduler) {
-        println("Now: ${Time.markNow()}")
         val flow = MutableStateFlow(false)
         val tracker = BooleanTracker(flow, 10.seconds)
         val expr = HasFluctuated(inLast = 10.seconds)

@@ -17,6 +17,8 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import runix.runtime.internal.RuntimeScope
 import runix.primitives.action.ActionResult.Success
+import runix.tracing.TraceEventContextElement
+import runix.tracing.events.ActionRequested
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.cancellation.CancellationException
@@ -29,8 +31,14 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ActionQueueTest {
+    // TraceEventContextElement must be embedded in testScope's context, not applied via withContext
+    // inside runQueueTest. async {} and launch {} inherit context from the CoroutineScope they are
+    // called on (testScope), not from the calling coroutine. A withContext wrapper only affects
+    // direct suspend calls in the current coroutine, so child coroutines launched from test lambdas
+    // would still lack the element.
     private val testDispatcher = StandardTestDispatcher()
-    private val testScope = TestScope(testDispatcher)
+    private val testTraceEvent = ActionRequested(parent = null, actionName = "test")
+    private val testScope = TestScope(testDispatcher + TraceEventContextElement(testTraceEvent))
 
     @BeforeTest
     fun setup() {
@@ -99,8 +107,9 @@ class ActionQueueTest {
         ) { queue ->
             val result = async { queue.submit(1) }
             advanceUntilIdle()
-            assertTrue(result.await() is ActionResult.Failure)
-            assertEquals(thrownException, (result.await() as ActionResult.Failure).cause)
+            val failure = result.await() as ActionResult.Failure
+            assertTrue(failure.cause is RuntimeException)
+            assertEquals(thrownException.message, failure.cause.message)
         }
     }
 
@@ -448,21 +457,23 @@ class ActionQueueTest {
 
     @Test
     fun `queue can accept new tasks after cancelAll`() = testScope.runTest {
-        val queue = createQueue()
+        runQueueTest(
+            queueBuilder = { createQueue() }
+        ) { queue ->
+            // First cancel everything
+            queue.cancelAll()
+            advanceUntilIdle()
 
-        // First cancel everything
-        queue.cancelAll()
-        advanceUntilIdle()
+            // Then submit a new task - this should succeed if the queue is designed to be reusable
+            val result = async { queue.submit(1) }
+            advanceUntilIdle()
 
-        // Then submit a new task - this should succeed if the queue is designed to be reusable
-        val result = async { queue.submit(1) }
-        advanceUntilIdle()
-
-        // Check that the task completed successfully
-        assertTrue(
-            result.await() is Success,
-            "Queue should accept new tasks after cancelAll by creating a new channel"
-        )
+            // Check that the task completed successfully
+            assertTrue(
+                result.await() is Success,
+                "Queue should accept new tasks after cancelAll by creating a new channel"
+            )
+        }
     }
 
     @Test
@@ -470,66 +481,66 @@ class ActionQueueTest {
         val processingEvents = mutableListOf<String>()
         val workerStates = mutableListOf<String>()
 
-        // Use non-concurrent queue to ensure synchronous processing
-        val queue = createQueue(
-            name = "TestIdleShutdownQueue",
-            allowConcurrent = false, // Use non-concurrent mode
-            block = { value ->
-                // Record when we're processing an item
-                processingEvents.add("Processing $value")
-                // Add a delay to ensure we can capture state during processing
-                delay(100)
-                Success
+        runQueueTest(
+            queueBuilder = {
+                createQueue(
+                    name = "TestIdleShutdownQueue",
+                    allowConcurrent = false,
+                    block = { value ->
+                        processingEvents.add("Processing $value")
+                        delay(100)
+                        Success
+                    }
+                )
             }
-        )
+        ) { queue ->
+            // Function to check both worker and sync state
+            fun recordWorkerState(label: String) {
+                val isActive = queue.isWorkerActive() || queue.isAnyJobActive()
+                workerStates.add("$label: ${if (isActive) "Active" else "Inactive"}")
+            }
 
-        // Function to check both worker and sync state
-        fun recordWorkerState(label: String) {
-            // When using non-concurrent mode, the isRunningSynchronously flag is a better indicator
-            val isActive = queue.isWorkerActive() || queue.isAnyJobActive()
-            workerStates.add("$label: ${if (isActive) "Active" else "Inactive"}")
+            // Initially no worker should be active
+            recordWorkerState("Initial")
+
+            // Submit first task but don't complete it yet
+            launch { queue.submit(1) }
+            // Advance time just enough to start processing but not complete
+            advanceTimeBy(50)
+            recordWorkerState("During task 1")
+
+            // Now let the task complete
+            advanceTimeBy(100)
+            advanceUntilIdle()
+            recordWorkerState("After task 1")
+
+            // Submit second task
+            launch { queue.submit(2) }
+            // Check during processing
+            advanceTimeBy(50)
+            recordWorkerState("During task 2")
+
+            // Complete the task
+            advanceTimeBy(100)
+            advanceUntilIdle()
+            recordWorkerState("After task 2")
+
+            // Print for debugging
+            workerStates.forEach { println(it) }
+
+            // Verify correct states - in synchronous mode, the queue sets isRunningSynchronously flag
+            assertTrue(
+                workerStates.filter { it.contains("During") }.all { it.contains("Active") },
+                "Queue should be active during task processing. States: $workerStates"
+            )
+
+            assertTrue(
+                workerStates.filter { it.contains("After") }.all { it.contains("Inactive") },
+                "Queue should be inactive between tasks. States: $workerStates"
+            )
+
+            // Verify processing order
+            assertEquals(listOf("Processing 1", "Processing 2"), processingEvents)
         }
-
-        // Initially no worker should be active
-        recordWorkerState("Initial")
-
-        // Submit first task but don't complete it yet
-        val task1 = launch { queue.submit(1) }
-        // Advance time just enough to start processing but not complete
-        advanceTimeBy(50)
-        recordWorkerState("During task 1")
-
-        // Now let the task complete
-        advanceTimeBy(100)
-        advanceUntilIdle()
-        recordWorkerState("After task 1")
-
-        // Submit second task
-        val task2 = launch { queue.submit(2) }
-        // Check during processing
-        advanceTimeBy(50)
-        recordWorkerState("During task 2")
-
-        // Complete the task
-        advanceTimeBy(100)
-        advanceUntilIdle()
-        recordWorkerState("After task 2")
-
-        // Print for debugging
-        workerStates.forEach { println(it) }
-
-        // Verify correct states - in synchronous mode, the queue sets isRunningSynchronously flag
-        assertTrue(
-            workerStates.filter { it.contains("During") }.all { it.contains("Active") },
-            "Queue should be active during task processing. States: $workerStates"
-        )
-
-        assertTrue(
-            workerStates.filter { it.contains("After") }.all { it.contains("Inactive") },
-            "Queue should be inactive between tasks. States: $workerStates"
-        )
-
-        // Verify processing order
-        assertEquals(listOf("Processing 1", "Processing 2"), processingEvents)
     }
 }

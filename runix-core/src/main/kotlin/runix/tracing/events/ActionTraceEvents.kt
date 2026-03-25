@@ -2,66 +2,119 @@ package runix.tracing.events
 
 import java.time.Instant
 import java.util.UUID
+import kotlin.time.Duration
+
+/**
+ * Base class for all action-related trace events.
+ * Provides common fields and structure for action tracing.
+ */
+internal sealed class ActionTraceEvent : TraceEvent {
+    abstract val actionName: String
+}
+
+/**
+ * Emitted when an Action is first requested but not yet started execution.
+ * This marks the beginning of the action lifecycle.
+ */
+internal data class ActionRequested(
+    override val timestamp: Instant = Instant.now(),
+    override val traceId: UUID = UUID.randomUUID(),
+    override val parent: TraceEvent?,
+    override val actionName: String
+) : ActionTraceEvent() {
+    override fun toString(): String {
+        return "${this.javaClass.simpleName}($actionName): [${traceId.toString().take(8)}]"
+    }
+}
+
 
 /**
  * Emitted when an Action begins execution.
  */
-data class ActionStarted(
+internal data class ActionStarted(
     override val timestamp: Instant = Instant.now(),
     override val traceId: UUID = UUID.randomUUID(),
-    override val componentPath: String,
-    val actionName: String
-) : TraceEvent
+    override val parent: TraceEvent?,
+    override val actionName: String
+) : ActionTraceEvent() {
+    override fun toString(): String {
+        return "${this.javaClass.simpleName}($actionName, startedAt: $timestamp): [${traceId.toString().take(8)}]"
+    }
+}
 
 /**
  * Emitted when an Action completes successfully.
  */
-data class ActionSucceeded(
+internal data class ActionSucceeded(
     override val timestamp: Instant = Instant.now(),
-    override val traceId: UUID,
-    override val componentPath: String,
-    val result: String,
-    val durationMillis: Long
-) : TraceEvent
+    override val traceId: UUID = UUID.randomUUID(),
+    override val parent: TraceEvent?,
+    override val actionName: String,
+    val duration:  Long
+) : ActionTraceEvent() {
+    override fun toString(): String {
+        return "${this.javaClass.simpleName}($actionName, endedAt: $timestamp, duration: $duration): [${traceId.toString().take(8)}]"
+    }
+}
 
 /**
- * Emitted when an Action fails during execution.
+ * Emitted when an Action fails due to an exception.
  */
-data class ActionFailed(
+internal data class ActionFailed(
     override val timestamp: Instant = Instant.now(),
-    override val traceId: UUID,
-    override val componentPath: String,
-    val reason: String,
-    val durationMillis: Long
-) : TraceEvent
+    override val traceId: UUID = UUID.randomUUID(),
+    override val parent: TraceEvent?,
+    override val actionName: String,
+    val exceptionClass: String,
+    val message: String?,
+    val duration:  Long
+) : ActionTraceEvent() {
+    override fun toString(): String {
+        return "${this.javaClass.simpleName}($actionName, message: $message): [${traceId.toString().take(8)}]"
+    }
+}
 
 /**
- * Emitted when an Action is cancelled.
+ * Emitted when an Action is cancelled before completion.
  */
-data class ActionCancelled(
+internal data class ActionCancelled(
     override val timestamp: Instant = Instant.now(),
-    override val traceId: UUID,
-    override val componentPath: String,
-    val reason: String
-) : TraceEvent
+    override val traceId: UUID = UUID.randomUUID(),
+    override val parent: TraceEvent?,
+    override val actionName: String,
+    val duration:  Long
+) : ActionTraceEvent() {
+    override fun toString(): String {
+        return "${this.javaClass.simpleName}($actionName): [${traceId.toString().take(8)}]"
+    }
+}
 
 /**
  * Emitted when an Action exceeds its time limit and is forcefully terminated.
  */
-data class ActionTimedOut(
+internal data class ActionTimedOut(
     override val timestamp: Instant = Instant.now(),
-    override val traceId: UUID,
-    override val componentPath: String,
-    val timeoutMillis: Long
-) : TraceEvent
+    override val traceId: UUID = UUID.randomUUID(),
+    override val parent: TraceEvent?,
+    override val actionName: String,
+    val timeoutDurationMillis: Long,
+    val duration:  Long
+) : ActionTraceEvent() {
+    override fun toString(): String {
+        return "${this.javaClass.simpleName}($actionName, timeout: $timeoutDurationMillis): [${traceId.toString().take(8)}]"
+    }
+}
 
 /**
- * Emitted when an Action is aborted or blocked due to a conflict with another running or queued action.
+ * Emitted when an Action cannot be executed because it's already running.
  */
-data class ActionConflictDetected(
+internal data class ActionRejectedAlreadyRunning(
     override val timestamp: Instant = Instant.now(),
-    override val traceId: UUID,
-    override val componentPath: String,
-    val conflictingActionName: String,
-    val resolutionStrategy: String
-) : TraceEvent
+    override val traceId: UUID = UUID.randomUUID(),
+    override val parent: TraceEvent?,
+    override val actionName: String
+) : ActionTraceEvent() {
+    override fun toString(): String {
+        return "${this.javaClass.simpleName}($actionName): [${traceId.toString().take(8)}]"
+    }
+}

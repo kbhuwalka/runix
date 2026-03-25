@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import runix.runtime.internal.RuntimeScope
+import runix.utils.Logger
 
 /**
  * Central runtime manager for the runtime environment.
@@ -12,12 +13,13 @@ import runix.runtime.internal.RuntimeScope
  */
 internal object AppRuntime {
     private var isRunning = false
+    val logger = Logger.getLogger<AppRuntime>()
 
     /**
      * Initializes the runtime environment.
      * This sets up the coroutine scope and starts the scheduler.
      */
-    suspend fun initialize() {
+    fun initialize() {
         check(!isRunning) { "AppRuntime is already running." }
 
         // Create and install the RuntimeScope
@@ -43,7 +45,7 @@ internal object AppRuntime {
             RuntimeScope.scope.cancel("AppRuntime shutdown")
         } catch (e: Exception) {
             // Log but don't rethrow to ensure cleanup continues
-            System.err.println("Error canceling RuntimeScope: ${e.message}")
+            logger.error { "Runtime encountered error: ${e.message}" }
         } finally {
             // Clear the RuntimeScope reference
             RuntimeScope.clear()

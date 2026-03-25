@@ -1,9 +1,13 @@
-package runix.runtime.internal
+package runix.primitives.signal
 
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import runix.primitives.reaction.ReactionHandle
-import runix.primitives.signal.SignalHandle
+import runix.runtime.internal.RuntimeScope
+import runix.tracing.TraceEventContextElement
+import runix.utils.Logger
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.coroutines.coroutineContext
 
 /**
  * Internal message router for `SignalHandle` emissions.
@@ -15,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap
  * - Decoupled dispatch and handler registration
  */
 internal object SignalBus {
+    val logger = Logger.getLogger<SignalBus>()
     // Map of signals to sets of ReactionHandles
     private val registrations = ConcurrentHashMap<SignalHandle<*>, MutableSet<ReactionHandle<*>>>()
 
@@ -28,19 +33,27 @@ internal object SignalBus {
      * @param value The data payload associated with the signal emission
      */
     @Suppress("UNCHECKED_CAST")
-    fun <T> emit(signal: SignalHandle<T>, value: T) {
+    suspend fun <T> emit(signal: SignalHandle<T>, value: T) {
         // Get all reaction handles registered for this signal
         val reactions = registrations[signal] ?: return
-        
+
+        val context = coroutineContext
+        val traceElement = context[TraceEventContextElement]
+        val launchContext = if (traceElement != null) {
+            context + traceElement
+        } else {
+            context
+        }
+
         // Launch each reaction handler in the runtime scope with error handling
         reactions.forEach { reaction ->
-            RuntimeScope.scope.launch {
+            RuntimeScope.scope.launch(launchContext.minusKey(Job)) {
                 try {
                     val typedReaction = reaction as ReactionHandle<T>
-                    typedReaction.handler(value)
+                    typedReaction.executeReaction(value)
                 } catch (e: Exception) {
                     // Log error but don't let it crash the system
-                    System.err.println("Error in reaction '${reaction.name}' to signal '${signal.name}': ${e.message}")
+                    logger.error{ "Error in $reaction to signal $signal: ${e.message}" }
                     e.printStackTrace()
                 }
             }
@@ -71,7 +84,7 @@ internal object SignalBus {
      */
     fun <T> unregister(signal: SignalHandle<T>, reaction: ReactionHandle<T>) {
         registrations[signal]?.remove(reaction)
-        
+
         // If there are no more reactions for this signal, remove the entry
         if (registrations[signal]?.isEmpty() == true) {
             registrations.remove(signal)

@@ -14,9 +14,8 @@ import kotlin.time.Duration
  */
 internal open class NumericTracker(
     flow: StateFlow<Double>,
-    private val retention: Duration,
-    scope: CoroutineScope = RuntimeScope.scope
-) : BaseTracker<Double>(flow, retention, scope) {
+    private val retention: Duration
+) : BaseTracker<Double>(flow, retention) {
 
     override fun registerWith(key: String) {
         TrackerRegistry.register(key, this)

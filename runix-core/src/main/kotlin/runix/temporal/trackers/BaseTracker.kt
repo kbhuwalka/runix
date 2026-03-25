@@ -28,12 +28,7 @@ import kotlin.time.Duration
  */
 internal abstract class BaseTracker<T>(
     flow: StateFlow<T>,
-    retention: Duration,
-    /**
-     * Collector scope—defaults to the global RuntimeScope but can be overridden
-     * in tests or alternate contexts.
-     */
-    scope: CoroutineScope = RuntimeScope.scope
+    retention: Duration
 ) {
 
     abstract fun registerWith(key: String)
@@ -45,11 +40,10 @@ internal abstract class BaseTracker<T>(
             retention = retention
         )
 
-    private val job: Job = scope.launch {
+    private val job: Job = RuntimeScope.scope.launch {
         try {
             flow.collect { value ->
                 val mark = Time.markNow()
-                println("Adding: $value, at= $mark")
                 history.append(value, mark)
             }
         } catch (e: Throwable) {

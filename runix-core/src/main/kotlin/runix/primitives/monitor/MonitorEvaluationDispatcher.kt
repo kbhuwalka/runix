@@ -1,7 +1,7 @@
 package runix.primitives.monitor
 
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import runix.runtime.internal.RuntimeScope
 import runix.temporal.time.delayUntil
@@ -15,26 +15,29 @@ import kotlin.time.TimeMark
  * they will be coalesced into a single extra run.
  *
  * Supports scheduling an evaluation at a future [TimeMark] and cancelling it.
+ *
+ * Concurrency model: [requestEvaluate] is safe to call from multiple coroutines concurrently.
+ * A [Channel.CONFLATED] trigger collapses concurrent requests into at most one pending run.
+ * An [AtomicBoolean] gate ensures exactly one worker is started at a time. On exit, the worker
+ * performs a final channel check to guard against items that arrive between the last drain and
+ * releasing the gate.
  */
-class MonitorEvaluationDispatcher(
-    private val scope: CoroutineScope = RuntimeScope.scope,
+internal class MonitorEvaluationDispatcher(
     private val evaluate: suspend () -> Unit
 ) {
+    private val trigger = Channel<Unit>(Channel.CONFLATED)
+    private val workerRunning = AtomicBoolean(false)
 
-    private var activeJob: Job? = null
-    private var scheduledJob: Job? = null
-    private val pending = AtomicBoolean(false)
+    @Volatile private var workerJob: Job? = null
+    @Volatile private var scheduledJob: Job? = null
 
     /**
      * Requests an evaluation to occur as soon as possible.
-     * If one is already running, it will coalesce to run once more after.
+     * If one is already running, the request is coalesced into a single follow-up run.
      */
     fun requestEvaluate() {
-        if (activeJob == null) {
-            runEvaluation()
-        } else {
-            pending.set(true)
-        }
+        trigger.trySend(Unit)
+        maybeStartWorker()
     }
 
     /**
@@ -44,8 +47,7 @@ class MonitorEvaluationDispatcher(
      */
     fun scheduleEvaluateAt(targetTime: ComparableTimeMark) {
         scheduledJob?.cancel()
-
-        scheduledJob = scope.launch {
+        scheduledJob = RuntimeScope.scope.launch {
             delayUntil(targetTime)
             requestEvaluate()
         }
@@ -64,19 +66,27 @@ class MonitorEvaluationDispatcher(
      * the current evaluation and any scheduled evaluations.
      */
     fun shutdown() {
-        activeJob?.cancel()
+        workerJob?.cancel()
+        workerJob = null
         scheduledJob?.cancel()
-        pending.set(false)
+        scheduledJob = null
     }
 
-    private fun runEvaluation() {
-        activeJob = scope.launch {
-            try {
-                evaluate()
-            } finally {
-                activeJob = null
-                if (pending.getAndSet(false)) {
-                    runEvaluation()
+    private fun maybeStartWorker() {
+        if (workerRunning.compareAndSet(false, true)) {
+            workerJob = RuntimeScope.scope.launch {
+                try {
+                    while (trigger.tryReceive().isSuccess) {
+                        evaluate()
+                    }
+                } finally {
+                    workerJob = null
+                    workerRunning.set(false)
+                    // An item may have arrived between the last tryReceive and releasing the gate.
+                    // If so, re-trigger so it isn't stranded.
+                    if (trigger.tryReceive().isSuccess) {
+                        requestEvaluate()
+                    }
                 }
             }
         }

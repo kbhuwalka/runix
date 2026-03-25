@@ -1,12 +1,13 @@
 package runix.temporal.trackers
 
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import runix.runtime.internal.RuntimeScope
 import runix.temporal.time.TestSchedulerTimeProvider
 import runix.temporal.time.Time
 import kotlin.test.AfterTest
@@ -20,15 +21,18 @@ import kotlin.time.ExperimentalTime
 @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
 class BaseTrackerTest {
     private val scheduler = TestCoroutineScheduler()
+    private val testScope = TestScope(scheduler)
     private val provider = TestSchedulerTimeProvider(scheduler)
 
     @BeforeTest
     fun setup() {
         Time.setProvider(provider)
+        RuntimeScope.install(testScope)
     }
 
     @AfterTest
     fun tearDown() {
+        RuntimeScope.clear()
         Time.resetToRealTime()
     }
 
@@ -37,9 +41,8 @@ class BaseTrackerTest {
      */
     private class TestTracker<T>(
         flow: MutableStateFlow<T>,
-        retention: Duration,
-        scope: CoroutineScope
-    ) : BaseTracker<T>(flow, retention, scope) {
+        retention: Duration
+    ) : BaseTracker<T>(flow, retention) {
         fun entries() = history.entries().toList()
         override fun registerWith(key: String) {}
     }
@@ -47,7 +50,7 @@ class BaseTrackerTest {
     @Test
     fun `seed on creation`() = runTest(scheduler) {
         val flow = MutableStateFlow("X")
-        val tracker = TestTracker(flow, retention = 5.seconds, scope = this)
+        val tracker = TestTracker(flow, retention = 5.seconds)
         advanceUntilIdle()
         tracker.stop()
 
@@ -58,7 +61,7 @@ class BaseTrackerTest {
     @Test
     fun `append on update`() = runTest(scheduler) {
         val flow = MutableStateFlow(0)
-        val tracker = TestTracker(flow, retention = 5.seconds, scope = this)
+        val tracker = TestTracker(flow, retention = 5.seconds)
         advanceUntilIdle()
 
         // advance time before new update
@@ -74,7 +77,7 @@ class BaseTrackerTest {
     @Test
     fun `no-dup on same value`() = runTest(scheduler) {
         val flow = MutableStateFlow(42)
-        val tracker = TestTracker(flow, retention = 5.seconds, scope = this)
+        val tracker = TestTracker(flow, retention = 5.seconds)
         advanceUntilIdle()
 
         advanceTimeBy(1.seconds)
@@ -93,7 +96,7 @@ class BaseTrackerTest {
     @Test
     fun `stop cancels collector and prevents further updates`() = runTest(scheduler) {
         val flow = MutableStateFlow("start")
-        val tracker = TestTracker(flow, retention = 5.seconds, scope = this)
+        val tracker = TestTracker(flow, retention = 5.seconds)
         advanceUntilIdle()
 
         advanceTimeBy(1.seconds)
@@ -116,7 +119,7 @@ class BaseTrackerTest {
     @Test
     fun `retention window prunes old entries`() = runTest(scheduler) {
         val flow = MutableStateFlow(0)
-        val tracker = TestTracker(flow, retention = 2.seconds, scope = this)
+        val tracker = TestTracker(flow, retention = 2.seconds)
         advanceUntilIdle()
 
         // t = 0s, initial

@@ -20,9 +20,8 @@ import kotlin.time.Duration
  */
 internal open class CategoricalTracker<T>(
     flow: StateFlow<T>,
-    retention: Duration,
-    scope: CoroutineScope = RuntimeScope.scope
-) : BaseTracker<T>(flow, retention, scope) {
+    retention: Duration
+) : BaseTracker<T>(flow, retention) {
 
     override fun registerWith(key: String) {
         TrackerRegistry.register(key, this)

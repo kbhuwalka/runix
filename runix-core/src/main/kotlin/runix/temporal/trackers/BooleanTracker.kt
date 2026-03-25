@@ -24,8 +24,7 @@ import kotlin.time.Duration
 internal open class BooleanTracker(
     flow: StateFlow<Boolean>,
     private val retention: Duration,
-    scope: CoroutineScope = RuntimeScope.scope
-) : BaseTracker<Boolean>(flow, retention, scope) {
+) : BaseTracker<Boolean>(flow, retention) {
 
     override fun registerWith(key: String) {
         TrackerRegistry.register(key, this)

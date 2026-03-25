@@ -6,7 +6,7 @@ import kotlin.time.Duration.Companion.INFINITE
 /**
  * Configuration options for creating actions.
  * * @property timeout The maximum duration an action can run before timing out.
- *                  Default is 5 seconds.
+ *                  Default is [Duration.INFINITE] (no timeout).
  * @property allowConcurrent Whether multiple instances of this action can run simultaneously.
  *                          When false, only one instance will execute at a time.
  *                          Default is false (sequential execution).
@@ -18,7 +18,7 @@ import kotlin.time.Duration.Companion.INFINITE
 data class ActionOptions(
     val timeout: Duration = INFINITE,
     val allowConcurrent: Boolean = false,
-    val enqueueIfRunning: Boolean = true
+    val enqueueIfRunning: Boolean = false
 )
 
 /**
