@@ -26,7 +26,7 @@ These questions require memory, a record of what values were observed and when. 
 
 ```kotlin
 // MonitoredCondition, knows about history
-temperature.hasBeenAboveFor(80.0, forDuration = 30.seconds)
+temperature.hasBeenAbove(80.0, forDuration = 30.seconds)
 ```
 
 ## Three-outcome evaluation
@@ -39,7 +39,7 @@ When a `MonitoredCondition` is evaluated, the result is one of three things:
 
 Snapshot conditions like `isTrue()`, `isAbove()`, and `isIn()` only ever return True or False. Delayed is exclusive to temporal conditions, where time must accumulate before an answer is possible.
 
-Delayed is what makes time-based conditions work without polling. When `hasBeenAboveFor(80.0, forDuration = 30.seconds)` is evaluated 10 seconds into the threshold crossing, it knows the condition can't be true yet, but it can calculate exactly when to check again. The monitor schedules that recheck automatically.
+Delayed is what makes time-based conditions work without polling. When `hasBeenAbove(80.0, forDuration = 30.seconds)` is evaluated 10 seconds into the threshold crossing, it knows the condition can't be true yet, but it can calculate exactly when to check again. The monitor schedules that recheck automatically.
 
 If state changes before the recheck fires, the scheduled recheck is canceled and a fresh evaluation runs from the new state. Evaluations are never stale.
 
@@ -71,7 +71,7 @@ motionDetected.wasEverTrue(inLast = 30.seconds)
 
 ```kotlin
 temperature.isAbove(80.0)
-battery.hasBeenBelowFor(15.0, forDuration = 10.seconds)
+battery.hasBeenBelow(15.0, forDuration = 10.seconds)
 rpm.isStableWithin(margin = 5.0, inLast = 20.seconds)
 ```
 

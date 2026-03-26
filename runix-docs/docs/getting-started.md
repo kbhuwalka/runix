@@ -38,11 +38,11 @@ A monitor watches state and evaluates a condition. When the condition is met, it
 
 ```kotlin
 val temperatureMonitor = monitor("UnsafeTemperatureSustained") {
-    FoodSafetyState.temperature.hasBeenAboveFor(40.0, forDuration = 15.minutes)
+    FoodSafetyState.temperature.hasBeenAbove(40.0, forDuration = 15.minutes)
 } emits unsafeTemperature
 ```
 
-`hasBeenAboveFor` is a temporal condition. It tracks how long the value has continuously exceeded the threshold and re-evaluates only when `temperature` changes. No timers, no manual resets.
+`hasBeenAbove` is a temporal condition. It tracks how long the value has continuously exceeded the threshold and re-evaluates only when `temperature` changes. No timers, no manual resets.
 
 If the temperature drops below 40.0 at any point, the condition resets and the 15-minute clock starts over.
 

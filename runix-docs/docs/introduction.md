@@ -36,7 +36,7 @@ val temperature = MutableStateFlow(36.0)
 val unsafeTemperature = signal<Unit>("UnsafeTemperature")
 
 val tempMonitor = monitor("UnsafeTemperatureSustained") {
-    temperature.hasBeenAboveFor(40.0, forDuration = 15.minutes)
+    temperature.hasBeenAbove(40.0, forDuration = 15.minutes)
 } emits unsafeTemperature
 ```
 

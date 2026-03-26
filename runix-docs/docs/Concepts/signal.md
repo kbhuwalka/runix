@@ -48,7 +48,7 @@ Monitors connect to signals through the `emits` keyword:
 
 ```kotlin
 val tempMonitor = monitor("UnsafeTemperatureSustained") {
-    temperature.hasBeenAboveFor(40.0, forDuration = 15.minutes)
+    temperature.hasBeenAbove(40.0, forDuration = 15.minutes)
 } emits unsafeTemperature
 ```
 

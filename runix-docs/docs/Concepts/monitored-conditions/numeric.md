@@ -42,10 +42,10 @@ Use snapshot conditions when you only care about the current reading, not its hi
 
 ## Persistence
 
-### hasBeenAboveFor
+### hasBeenAbove
 
 ```kotlin
-fun StateFlow<Double>.hasBeenAboveFor(
+fun StateFlow<Double>.hasBeenAbove(
     threshold: Double,
     forDuration: Duration
 ): MonitoredCondition
@@ -54,13 +54,13 @@ fun StateFlow<Double>.hasBeenAboveFor(
 True only if the value has remained strictly above the threshold continuously for the full duration.
 
 ```kotlin
-temperature.hasBeenAboveFor(80.0, forDuration = 30.seconds)
+temperature.hasBeenAbove(80.0, forDuration = 30.seconds)
 ```
 
-### hasBeenBelowFor
+### hasBeenBelow
 
 ```kotlin
-fun StateFlow<Double>.hasBeenBelowFor(
+fun StateFlow<Double>.hasBeenBelow(
     threshold: Double,
     forDuration: Duration
 ): MonitoredCondition
@@ -69,7 +69,7 @@ fun StateFlow<Double>.hasBeenBelowFor(
 True only if the value has remained strictly below the threshold continuously for the full duration.
 
 ```kotlin
-pressure.hasBeenBelowFor(20.0, forDuration = 10.seconds)
+pressure.hasBeenBelow(20.0, forDuration = 10.seconds)
 ```
 
 Use persistence conditions to guard against transient spikes or dips. A brief temperature spike above 80 won't satisfy a 30-second persistence check, but a sustained reading will.

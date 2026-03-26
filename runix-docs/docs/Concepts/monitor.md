@@ -12,7 +12,7 @@ A monitor watches state and evaluates a condition. When the condition is met, it
 
 ```kotlin
 val batteryLow = monitor("BatteryLow") {
-    batteryLevel.hasBeenBelowFor(20.0, forDuration = 10.seconds)
+    batteryLevel.hasBeenBelow(20.0, forDuration = 10.seconds)
 } emits batteryLowSignal
 ```
 
@@ -46,7 +46,7 @@ val overheating = monitor("Overheating") {
 
 ```kotlin
 val batteryLow = monitor("BatteryLow") {
-    batteryLevel.hasBeenBelowFor(20.0, forDuration = 10.seconds)
+    batteryLevel.hasBeenBelow(20.0, forDuration = 10.seconds)
 } emits batteryLowSignal
 
 val motorUnstable = monitor("MotorUnstable") {

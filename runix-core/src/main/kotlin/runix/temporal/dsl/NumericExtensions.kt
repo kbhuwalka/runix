@@ -26,7 +26,7 @@ import kotlin.time.Duration
  *
  * Each condition is retention-aware and declaratively models one of:
  * - Snapshot comparisons (e.g., `.isAbove(...)`)
- * - Persistence of value (e.g., `.hasBeenAboveFor(...)`)
+ * - Persistence of value (e.g., `.hasBeenAbove(...)`)
  * - Historical dwell (e.g., `.wasBelow(...)`)
  * - Volatility and fluctuation (e.g., `.hasFluctuatedBeyond(...)`)
  * - Trends over time (e.g., `.isIncreasing(...)`)
@@ -102,16 +102,16 @@ fun LabeledFlow<Double>.isBelow(threshold: Double): MonitoredCondition =
  *
  * Example:
  * ```
- * temperature.hasBeenAboveFor(80.0, forDuration = 30.seconds)
+ * temperature.hasBeenAbove(80.0, forDuration = 30.seconds)
  * ```
  */
-fun StateFlow<Double>.hasBeenAboveFor(threshold: Double, forDuration: Duration): MonitoredCondition =
+fun StateFlow<Double>.hasBeenAbove(threshold: Double, forDuration: Duration): MonitoredCondition =
     NumericLeaf(this, HasPersistedAbove(threshold, forDuration))
 
 /**
- * @see [StateFlow.hasBeenAboveFor]
+ * @see [StateFlow.hasBeenAbove]
  */
-fun LabeledFlow<Double>.hasBeenAboveFor(threshold: Double, forDuration: Duration): MonitoredCondition =
+fun LabeledFlow<Double>.hasBeenAbove(threshold: Double, forDuration: Duration): MonitoredCondition =
     NumericLeaf(flow, HasPersistedAbove(threshold, forDuration))
 
 /**
@@ -128,16 +128,16 @@ fun LabeledFlow<Double>.hasBeenAboveFor(threshold: Double, forDuration: Duration
  *
  * Example:
  * ```
- * pressure.hasBeenBelowFor(20.0, forDuration = 10.seconds)
+ * pressure.hasBeenBelow(20.0, forDuration = 10.seconds)
  * ```
  */
-fun StateFlow<Double>.hasBeenBelowFor(threshold: Double, forDuration: Duration): MonitoredCondition =
+fun StateFlow<Double>.hasBeenBelow(threshold: Double, forDuration: Duration): MonitoredCondition =
     NumericLeaf(this, HasPersistedBelow(threshold, forDuration))
 
 /**
- * @see [StateFlow.hasBeenBelowFor]
+ * @see [StateFlow.hasBeenBelow]
  */
-fun LabeledFlow<Double>.hasBeenBelowFor(threshold: Double, forDuration: Duration): MonitoredCondition =
+fun LabeledFlow<Double>.hasBeenBelow(threshold: Double, forDuration: Duration): MonitoredCondition =
     NumericLeaf(flow, HasPersistedBelow(threshold, forDuration))
 
 // ─────────────────────────────────────────────────────────────
