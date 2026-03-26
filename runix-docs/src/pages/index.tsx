@@ -43,7 +43,7 @@ export default function Home(): ReactNode {
           <p className={styles.tagline}>
             A cognitive engine for real-time reasoning and behavior
           </p>
-          <Link className="button button--primary" to="/docs/getting-started">
+          <Link className="button button--primary" to="/getting-started">
             Learn More
           </Link>
         </section>

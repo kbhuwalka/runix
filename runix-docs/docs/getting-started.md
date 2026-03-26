@@ -1,98 +1,109 @@
 ---
 id: getting-started
 title: Getting Started
+sidebar_position: 2
 slug: /getting-started
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # Getting Started
 
-This guide introduces the fundamentals of Runix by walking through a complete, working example.
+This page walks through a complete Runix application from scratch. By the end you'll have seen the core primitives (state, signal, monitor, and reaction) and how they wire together into a running app.
 
-You'll see how each part of the system fits together—from defining state, to evaluating conditions, to triggering signals and executing reactions.
+## The scenario
 
+A food storage system needs to comply with safety guidelines: if a bin's temperature rises above 40°F and stays there for 15 continuous minutes, the cooling system must activate and an alert must be sent.
 
-## A Full Cognitive Loop
+## Step 1: Define state
 
-This example models a food safety system. If the temperature of a storage bin remains above 40°F for 15 minutes, the system shuts down the cooling system and alerts the user.
-
-<Tabs groupId="cognitive-loop">
-  <TabItem value="state" label="State">
+State is a plain `MutableStateFlow`, standard Kotlin. There's nothing Runix-specific to register. Any flow can be observed by a monitor.
 
 ```kotlin
-object States {
+object FoodSafetyState {
     val temperature = MutableStateFlow(36.0)
     val coolingActive = MutableStateFlow(false)
 }
 ```
 
-This defines the reactive state that the system observes. When `temperature` changes, monitors depending on it will re-evaluate.
+## Step 2: Declare a signal
 
-  </TabItem>
-  <TabItem value="signal" label="Signal">
+Signals decouple what is detected from what happens in response. The monitor will emit this signal; the reaction will receive it.
 
 ```kotlin
-object Signals {
-    val UnsafeTemperature = Signal("UnsafeTemperature")
+val unsafeTemperature = signal<Unit>("UnsafeTemperature")
+```
+
+## Step 3: Declare a monitor
+
+A monitor watches state and evaluates a condition. When the condition is met, it emits the signal.
+
+```kotlin
+val temperatureMonitor = monitor("UnsafeTemperatureSustained") {
+    FoodSafetyState.temperature.hasBeenAboveFor(40.0, forDuration = 15.minutes)
+} emits unsafeTemperature
+```
+
+`hasBeenAboveFor` is a temporal condition. It tracks how long the value has continuously exceeded the threshold and re-evaluates only when `temperature` changes. No timers, no manual resets.
+
+If the temperature drops below 40.0 at any point, the condition resets and the 15-minute clock starts over.
+
+## Step 4: Declare a reaction
+
+A reaction subscribes to a signal and runs a suspend block when it arrives. It can update state, emit other signals, or call external systems.
+
+```kotlin
+val onUnsafeTemperature = reaction(
+    name = "HandleUnsafeTemperature",
+    signal = unsafeTemperature
+) {
+    FoodSafetyState.coolingActive.value = true
+    println("Alert: temperature unsafe. Food may be at risk.")
 }
 ```
 
-Signals are emitted when a monitor condition is met. They serve as the trigger point for reactions.
+## Step 5: Create a module
 
-  </TabItem>
-  <TabItem value="monitor" label="Monitor">
-
-```kotlin
-val unsafeTemperature= derivedStateFlow(States.temperature) { it > 40 }
-
-monitor("UnsafeTemperatureSustained") {
-    fireIf(unsafeTemperature.persistedFor(15.minutes))
-    emits(Signal.UnsafeTemperature)
-}
-```
-
-This monitor watches for sustained unsafe temperature. It will emit a signal only if the temperature remains above 40°F for 15 continuous minutes.
-
-  </TabItem>
-  <TabItem value="reaction" label="Reaction">
+Modules own the lifecycle of their primitives. Registration tells the runtime which monitors and reactions to start, and ensures they're stopped cleanly on shutdown. Declaring a primitive without registering it has no effect.
 
 ```kotlin
-reaction("HandleUnsafeTemperature") {
-    on(Signal.UnsafeTemperature)
-
-    run { ctx ->
-        ctx.schedule(Announce("Temperature too high. Food may be unsafe."))
-        ctx.schedule(Actions.activateCooling)
-    }
-}
-```
-
-This reaction is subscribed to the signal and executes two actions when it's received: announce the event and shut off the cooling system.
-
-  </TabItem>
-  <TabItem value="action" label="Action">
-
-```kotlin
-object Actions {
-    val activateCooling = action("ActivateCooling") {
-        onExecute {
-            States.coolingActive.value = true
-            return ActionResult.Success("Cooling system turned on")
+object FoodSafetyModule : AppModule("FoodSafety") {
+    init {
+        defineBehavior {
+            +temperatureMonitor
+            +onUnsafeTemperature
         }
     }
 }
 ```
 
-This action updates the system state directly. Actions are the final output of the execution loop and are free to mutate or communicate externally.
+## Step 6: Create and start the app
 
-  </TabItem>
-</Tabs>
+An `App` installs modules and runs the runtime.
 
+```kotlin
+object FoodSafetyApp : App() {
+    init {
+        install(FoodSafetyModule)
+    }
+}
 
-## Next Steps
+fun main() {
+    FoodSafetyApp.start()
+}
+```
 
-- Explore [Monitors](./concepts/monitor.md) in more depth
-- Learn about [Temporal Expressions](./concepts/temporal.md)
-- Review the [DSL Reference](./dsl/reference.md)
+`start()` blocks the current thread and keeps the app running until the process is terminated. The runtime handles activation, shutdown hooks, and cleanup automatically.
+
+## What happens at runtime
+
+1. `temperatureMonitor` activates and begins watching `FoodSafetyState.temperature`
+2. Each time `temperature` changes, the condition re-evaluates
+3. Once `temperature` has been above 40.0 for 15 continuous minutes, the monitor emits `unsafeTemperature`
+4. The runtime delivers the signal to `onUnsafeTemperature`
+5. The reaction sets `coolingActive` to `true` and prints the alert
+
+## Next steps
+
+- [The Cognitive Loop](./cognitive-loop.md): how all the primitives connect
+- [Actions](./Concepts/action.md): managed processes for long-running or concurrent work
+- [Monitors](./Concepts/monitor.md): condition types and evaluation behavior
+- [Monitored Conditions](./Concepts/monitored-conditions/index.md): the full set of condition types

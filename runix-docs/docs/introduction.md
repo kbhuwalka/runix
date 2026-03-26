@@ -1,95 +1,62 @@
 ---
 id: introduction
 title: Introduction
-slug: /
+sidebar_position: 1
+slug: /introduction
 ---
 
 # What is Runix
 
-Runix is a reactive cognitive framework for real-time systems.  
-It transforms how you write decision logic—introducing a model where perception, reasoning, and action are time-aware, signal-driven, and fully traceable.
+Runix is a framework for writing decision logic in real-time systems. It gives your conditions **memory**, the ability to reason not just about what is true now, but what has been true, for how long, and in what sequence.
 
-### The Problem
+## The problem with traditional control logic
 
-Most control logic in robotics and real-time systems still relies on:
-
-- Polling loops that constantly check state
-- Timers that must be manually managed
-- State machines that grow brittle as they grow
-- Conditionals without memory or context
-
-These approaches are difficult to scale, debug, or reason about. They conflate *how* the system thinks with *what* it should think about.
-
-## A Better Foundation
-
-Runix begins with a shift in how we frame conditions:
-
-> Logic isn’t just about what is true—it’s about **what has been true**, **how long it has been true**, and **what that means in context**.
-
-That idea—small on the surface—leads to a new architecture.
-
-Runix introduces a cognitive execution loop that gives your system:
-
-- Time-awareness
-- Memory of past values and events
-- Reactive signal emission
-- Declarative condition structure
-- Precise, traceable actions
-
-## From Logic to Cognition
-
-Runix encourages you to write logic that behaves more like cognition:
-
-- “Has this condition persisted for more than 5 seconds?”
-- “Did this failure happen multiple times recently?”
-- “Has the system been quiet for a while?”
-
-These are not edge cases.  
-They're how real systems behave under real load.
-
-For example, consider a food storage robot that must comply with food safety guidelines, such as keeping items below 40°F (4.4°C). You might express this logic as:
+Most systems evaluate conditions as snapshots:
 
 ```kotlin
-monitor("UnsafeTemperatureSustained") {
-    dependsOn(temperatureSensor)
-
-    condition {
-        temperatureSensor.map { it > 40.0 }
-            .persistedFor(15.minutes, key = "TempTooHigh")
-            .invoke()
-    }
-
-    trigger(Signal.UnsafeTemperatureDetected)
+if (temperature > 40.0) {
+    triggerAlert()
 }
 ```
 
-This monitor will emit a signal only if the temperature has exceeded 40°F for 15 continuous minutes.  
-There are no timers. No manual resets. The condition holds memory—and when it's met, it acts.
+This works for simple cases. But real systems ask harder questions:
 
-Runix encourages you to write logic that behaves more like cognition:
+- Has the temperature been above 40°F for 15 continuous minutes?
+- Did the error occur multiple times in the last hour?
+- Has the system been in an idle state long enough to resume safely?
 
-- “Has this condition persisted for more than 5 seconds?”
-- “Did this failure happen multiple times recently?”
-- “Has the system been quiet for a while?”
+Answering these requires timers, flags, and history tracking, written by hand across every condition that needs it. The logic that matters gets buried in glue code.
 
-These are not edge cases.  
-They're how real systems behave under real load.
+## What Runix does differently
 
-## What You Get
+Runix makes time and memory first-class parts of how you write conditions. The same food safety check becomes:
 
-- **Declarative monitors** that track conditions over time
-- **Signal-driven reactions** that execute logic in response
-- **Temporal expressions** like `.persistedFor`, `.wasSilentFor`, and `.occurredAtLeast`
-- **Precise re-evaluation scheduling** with no polling
-- **A reactive runtime** that scales with your system—not against it
+```kotlin
+val temperature = MutableStateFlow(36.0)
+val unsafeTemperature = signal<Unit>("UnsafeTemperature")
 
----
+val tempMonitor = monitor("UnsafeTemperatureSustained") {
+    temperature.hasBeenAboveFor(40.0, forDuration = 15.minutes)
+} emits unsafeTemperature
+```
 
-## Where to Go Next
+No timers. No manual resets. The condition tracks its own history and evaluates reactively, only when temperature changes.
 
-- [Get Started](./getting-started.md)
-- [Learn about Monitors](./concepts/monitor.md)
-- [Explore Temporal Expressions](./concepts/temporal.md)
-- [Browse the DSL Reference](./dsl/reference.md)
+When the condition is met, a signal is emitted. A reaction subscribed to that signal decides what to do.
 
-Runix gives you a way to think clearly about system behavior over time—without rewriting the same logic, or managing the same timers, again and again.
+## How behavior is structured
+
+Your state stays as plain `MutableStateFlow` (standard Kotlin). Runix introduces four primitives that sit above it:
+
+- **Monitors** watch state and evaluate conditions over time, emitting a signal when met
+- **Signals** are typed events that decouple detection from response
+- **Reactions** subscribe to signals and execute logic when they arrive
+- **Actions** are managed processes with concurrency and queuing semantics
+
+Each primitive has one job. Together they form a runtime where behavior is observable, testable, and easy to trace when something goes wrong.
+
+## Where to go next
+
+- [Getting Started](./getting-started.md): a full working example end to end
+- [The Cognitive Loop](./cognitive-loop.md): how the primitives connect
+- [Monitors](./Concepts/monitor.md): deep dives into each primitive, starting here

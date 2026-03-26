@@ -1,108 +1,75 @@
 ---
 id: monitor
 title: Monitors
+sidebar_position: 1
 ---
 
 # Monitors
 
-Monitors are the cognitive sensors of Runix. They continuously evaluate conditions over time, and emit signals when those conditions are met.
+A monitor watches state and evaluates a condition. When the condition is met, it emits a signal. Monitors observe and report. Deciding what to do in response is a reaction's job.
 
-Unlike traditional polling loops or reactive `if` statements, monitors in Runix are declarative, reactive, and memory-aware. They only evaluate when their input state changes—and when they do, they consider not just *what* is true, but *for how long* it has been true.
+## The DSL
+
+```kotlin
+val batteryLow = monitor("BatteryLow") {
+    batteryLevel.hasBeenBelowFor(20.0, forDuration = 10.seconds)
+} emits batteryLowSignal
+```
+
+`monitor()` takes a name and a condition block. The condition block returns a `MonitoredCondition` built using the condition DSL on any `StateFlow`. The `emits` keyword is an infix function that connects the monitor to the signal it fires when the condition is met.
+
+## How evaluation works
+
+Monitors evaluate reactively, not by polling. When a `StateFlow` used in the condition emits a new value, the monitor re-evaluates. Between state changes, nothing runs.
+
+If a condition requires time to accumulate, the monitor schedules its own re-evaluation at the earliest moment the condition could become true. If state changes before that recheck fires, the scheduled recheck is canceled and a fresh evaluation runs from the new state. Evaluations are never stale.
+
+For the full evaluation model, including the three possible outcomes (True, False, Delayed) and how the memory system works, see [Monitored Conditions](./monitored-conditions/index.md).
+
+## Condition types
+
+Conditions are extension functions on `StateFlow`. There are two flavors.
+
+**Snapshot conditions** check the current value with no memory:
+
+```kotlin
+val doorOpen = monitor("DoorOpen") {
+    doorSensor.isTrue()
+} emits doorOpenedSignal
+
+val overheating = monitor("Overheating") {
+    temperature.isAbove(90.0)
+} emits overheatSignal
+```
+
+**Temporal conditions** reason over time and require history:
+
+```kotlin
+val batteryLow = monitor("BatteryLow") {
+    batteryLevel.hasBeenBelowFor(20.0, forDuration = 10.seconds)
+} emits batteryLowSignal
+
+val motorUnstable = monitor("MotorUnstable") {
+    motorRpm.hasFluctuatedBeyond(margin = 5.0, inLast = 3.seconds)
+} emits motorUnstableSignal
+```
+
+Temporal conditions are the reason monitors exist as a concept. A plain reactive `if` can express snapshots. Temporal conditions require the memory-tracking and scheduling infrastructure that monitors provide.
+
+Conditions also compose with `allOf`, `anyOf`, and `not`. See [Composing conditions](./monitored-conditions/index.md#composing-conditions) for details.
+
+## Labeling flows for traceability
+
+You can attach a label to a flow for clearer trace output and diagnostics:
+
+```kotlin
+val batteryLevel = rawBatteryFlow.label("battery.level")
+```
+
+`LabeledFlow` works with all the same condition extensions as `StateFlow`. The label appears in trace events and logs, making it easier to identify which input triggered a re-evaluation.
 
 ---
 
-## A Simple Monitor
+→ [Monitored Conditions](./monitored-conditions/index.md): the full reference for all condition types
 
-Here's a basic example of a monitor that watches a battery level and emits a signal if it stays below 20% for 10 seconds.
-
-```kotlin
-monitor("BatteryLow") {
-    dependsOn(batteryLevel)
-
-    condition {
-        batteryLevel.map { it < 20 }
-            .persistedFor(10.seconds, "BatteryLowCondition")
-            .invoke()
-    }
-
-    trigger(Signal.BatteryLow)
-}
-```
-
-This monitor will emit the `BatteryLow` signal only if the battery level remains under 20 continuously for 10 seconds. If the condition is interrupted (e.g. the battery level rises above 20), the timer resets.
-
----
-
-## Defining Input State
-
-Monitors observe `StateFlow<T>` inputs. These are typically defined using:
-
-```kotlin
-val batteryLevel = MutableStateFlow(100)
-```
-
-You can depend on as many flows as needed:
-
-```kotlin
-dependsOn(batteryLevel, isCharging, temperature)
-```
-
-Monitors will only re-evaluate when one of the dependencies emits a new value.
-
----
-
-## Condition Evaluation
-
-The `condition` block returns either a `Boolean` or a `ConditionEval` (via `.persistedFor`, `.wasSilentFor`, etc). You don't need to think about these types—just focus on writing your logic declaratively.
-
-You can use temporal expressions like:
-
-```kotlin
-.map { it < 30 }.persistedFor(5.seconds, key = "LowTemp").invoke()
-```
-
-Or simple state:
-
-```kotlin
-condition { doorIsOpen.value && !motorRunning.value }
-```
-
----
-
-## Triggering Signals
-
-When a monitor's condition is met, it emits a signal using the `trigger(...)` block:
-
-```kotlin
-trigger(Signal.MyConditionMet)
-```
-
-That signal is then received by any reactions that are subscribed to it.
-
----
-
-## Optional Throttling
-
-Monitors can include a `throttle(...)` to prevent the same condition from triggering too frequently.
-
-```kotlin
-throttle(30.seconds)
-```
-
-This ensures that once a monitor fires, it won’t fire again until the throttle window has passed—even if the condition remains true.
-
----
-
-## Monitor Behavior Summary
-
-| Feature               | Behavior                                          |
-|-----------------------|---------------------------------------------------|
-| **Reactive**          | Evaluates only when state changes                 |
-| **Time-aware**        | Can track persistence, silence, and event count   |
-| **Signal-driven**     | Emits named signals, decoupled from direct logic  |
-| **Declarative**       | Focus on what should happen, not how              |
-| **Fully observable**  | Every monitor evaluation is traceable             |
-
----
-
-Monitors form the foundation of Runix’s cognitive loop. They give your system memory, structure, and time-aware behavior—without the boilerplate of timers, loops, or state machines.
+→ [Signals](./signal.md): what happens when a monitor fires
