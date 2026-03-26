@@ -9,10 +9,10 @@ const config: Config = {
   tagline: 'A reactive cognitive framework for real-time systems.',
   favicon: 'img/favicon.ico',
 
-  url: 'https://runix.dev',
-  baseUrl: '/',
+  url: 'https://kbhuwalka.github.io',
+  baseUrl: '/runix/',
 
-  organizationName: 'runix',
+  organizationName: 'kbhuwalka',
   projectName: 'runix',
 
   onBrokenLinks: 'throw',
@@ -55,7 +55,7 @@ const config: Config = {
           label: 'Docs',
         },
         {
-          href: 'https://github.com/runix/runix',
+          href: 'https://github.com/kbhuwalka/runix',
           label: 'GitHub',
           position: 'right',
         },
@@ -82,7 +82,7 @@ const config: Config = {
           items: [
             {
               label: 'GitHub',
-              href: 'https://github.com/runix/runix',
+              href: 'https://github.com/kbhuwalka/runix',
             },
           ],
         },
